@@ -10,7 +10,7 @@ PHP Class for sending email.
     ```
 1. Include autoload file
     ```php
-    include('vendor/autoload.php');
+    require_once('vendor/autoload.php');
     ```
 ## Manually install
 1. Download [Archive](https://github.com/ddrv/mailer/archive/master.zip)
