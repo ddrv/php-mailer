@@ -1,8 +1,8 @@
 {
     "name": "ddrv/mailer",
-    "version":"1.0.0",
+    "version":"2.0.0",
     "require":{
-        "php":">=5.3.0"
+        "php":">=5.4.0"
     },
     "type": "library",
     "description": "PHP Class for sending email",

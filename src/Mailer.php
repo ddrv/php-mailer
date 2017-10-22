@@ -1,159 +1,271 @@
 <?php
+
 namespace Ddrv\Mailer;
+
 /**
  * PHP Class for sending email.
  *
- * PHP version 5.3
- *
- * @category Ddrv
- * @package  Mailer
  * @author   Ivan Dudarev (https://github.com/ddrv)
  * @license  MIT
  * @link     http://ddrv.ru/
  *
  * @property string  $sender
- * @property string  $charset
+ * @property string  $subject
+ * @property string  $encoding
  * @property array   $headers
+ * @property array   $body
+ * @property array   $attachments
  */
-
 class Mailer {
-    const MAILER_VERSION = '1.0.0';
+    /**
+     * Version of Mailer
+     */
+    const MAILER_VERSION = '2.0.0';
 
     /**
-     * send from this Email
+     * Send from this Email.
      *
      * @var string
      */
-    public $sender;
+    protected $sender;
 
     /**
-     * headers of mail
+     * Subject of mail.
+     *
+     * @var string
+     */
+    protected $subject;
+
+    /**
+     * Headers of mail.
      *
      * @var array
      */
-    public $headers;
+    protected $headers;
 
     /**
-     * charset of message
+     * Body of mail.
      *
      * @var array
      */
-    public $charset = 'utf8';
+    protected $body;
 
     /**
-     * Consructor
-     * @param array $sets
+     * Attachments.
+     *
+     * @var array
      */
-    public function __construct($sets=array()) {
-        if ($sets) {
-            foreach ($sets as $property => $value) {
-                if (in_array($property, array('sender','headers')) ) {
-                    $this->$property = $value;
-                }
-            }
-            $this->init();
+    protected $attachments;
+
+    /**
+     * Encoding of message.
+     *
+     * @var string
+     */
+    protected $encoding = 'utf8';
+
+    /**
+     * Mailer constructor.
+     *
+     * @param string $sender
+     * @param string $encoding
+     */
+    public function __construct($sender='admin@localhost', $encoding='utf8')
+    {
+        $this->sender = (string)$sender;
+        $this->encoding = preg_replace('/[^a-z0-9]/ui','',mb_strtolower((string)$encoding));
+        $this->reset();
+    }
+
+    /**
+     * Set subject of message.
+     *
+     * @param string $subject
+     * @void
+     */
+    public function subject($subject)
+    {
+        $this->subject = (string)$subject;
+    }
+
+    /**
+     * Set body of message.
+     *
+     * @param string $text
+     * @void
+     */
+    public function body($text)
+    {
+        $this->body = [
+            'headers' => [
+                'Content-Type' => 'text/html; charset='.$this->encoding,
+            ],
+            'content' => (string)$text,
+        ];
+    }
+
+    /**
+     * Add attachment from string.
+     *
+     * @param $content
+     * @param $attachmentName
+     * @void
+     */
+    public function attachFromString($content, $attachmentName)
+    {
+        $content = (string)$content;
+        if (!$content) {
+            return;
         }
+        $attachmentName = $this->prepareAttachmentName($attachmentName);
+        $this->attachments[$attachmentName] = [
+            'headers' => [
+                'Content-Type'              => 'application/octet-stream; name="'.$attachmentName.'"',
+                'Content-Transfer-Encoding' => 'base64',
+                'Content-Disposition'       => 'attachment',
+            ],
+            'content' => chunk_split(base64_encode($content)),
+        ];
     }
 
     /**
-     * Initialization this component and first record
-     * This method requred for Yii Framevork
+     * Add attachment file.
+     *
+     * @param $file
+     * @param $attachmentName
+     * @void
      */
-    public function init () {
-        if (empty($this->charset)) $this->charset = 'utf8';
-        if (empty($this->sender)) $this->sender = 'sender@localhost';
+    public function attachFromFile($file, $attachmentName)
+    {
+        $file = (string)$file;
+        if (!is_readable($file)) {
+            return;
+        }
+        $attachmentName = $this->prepareAttachmentName($attachmentName);
+        $this->attachments[$attachmentName] = [
+            'headers' => [
+                'Content-Type'              => 'application/octet-stream; name="'.$attachmentName.'"',
+                'Content-Transfer-Encoding' => 'base64',
+                'Content-Disposition'       => 'attachment',
+            ],
+            'content' => chunk_split(base64_encode(file_get_contents($file))),
+        ];
     }
 
     /**
-     * Send email to address
+     * Send message.
      *
      * @param string $address
-     * @param string $subject
-     * @param string $message
-     * @param array $attachments
+     * @void
      */
-    public function send($address,$subject,$message,$attachments=array()) {
-        $rawAttachments = empty($attachments)?array():$this->getRawAttachment($attachments);
-        $noModifiedHeaders = $this->headers;
+    public function send($address)
+    {
+        $body = empty($this->attachments)?$this->getBodySimpleText():$this->getBodyMultipart();
+        $headers = implode("\r\n",$this->headers);
+        mail($address, $this->subject, $body, $headers);
+        $this->reset();
+    }
+
+    /**
+     * Reset body and headers for nex mail
+     */
+    protected function reset()
+    {
+        $this->subject = '';
+        $this->body = [];
+        $this->headers = [];
+        $this->attachments = [];
         $this->setHeader('From', $this->sender, false);
         $this->setHeader('Reply-To', $this->sender, false);
         $this->setHeader('MIME-Version','1.0', false);
-        $this->setHeader('X-Mailer', 'ddrvMailer-'.self::MAILER_VERSION.' (https://github.com/ddrv/mailer)', false);
-        $body = empty($rawAttachments)?$this->getBodySimpleText($message):$this->getBodyMultipart($message, $rawAttachments);
-        $headers = implode("\r\n",$this->headers);
-        mail($address, $subject, $body, $headers);
-        $this->headers = $noModifiedHeaders;
+        $this->setHeader('X-Mailer', 'Mailer-'.self::MAILER_VERSION.' (https://github.com/ddrv/mailer)', false);
     }
 
-    protected function getRawAttachment($attachments=array()) {
-        $rawAttachments = array();
-        foreach ((array)$attachments as $attachment) {
-            if (
-                !empty($attachment['content'])
-                && !empty($attachment['name'])
-                && !empty($attachment['type'])
-                &&  in_array($attachment['type'], array('file','string'))
-            ) {
-                $name = preg_replace('/[\\\\\/\:\*\?\"<>]/ui', '_', $attachment['name']);
-                $content = null;
-                switch ($attachment['type']) {
-                    case 'file':
-                        $content = (file_exists($attachment['content']))?chunk_split(base64_encode(file_get_contents($attachment['content']))):null;
-                        break;
-                    case 'string':
-                        $content = chunk_split(base64_encode($attachment['content']));
-                        break;
-                }
-                if ($name && $content) {
-                    $rawAttachments[$name] = $content;
-                }
-            }
-        }
-        return $rawAttachments;
-    }
-
-    protected function getBodySimpleText($message) {
-        $this->setHeader('Content-type','text/html; charset='.$this->charset, true);
-        return $message;
-    }
-
-    protected function getBodyMultipart($message, $attachments) {
-        $separator = md5(time());
-        $eol = "\r\n";
-        $this->setHeader('Content-Type', 'multipart/mixed; boundary="'.$separator.'"', true);
-        $this->setHeader('Content-Transfer-Encoding', '7bit', true);
-
-        $body[] = null;
-        $b = $eol.'Content-type: text/html; charset='.$this->charset.$eol;
-        $bits = '7bit';
-        switch ($this->charset) {
-            case 'utf-8':
-            case 'utf8': $bits='8bit'; break;
-        }
-        $b .= 'Content-Transfer-Encoding: '.$bits.$eol;
-        $b .= $eol.$message.$eol;
-        $body[] = $b;
-        foreach ($attachments as $file=>$content) {
-            $b = $eol.'Content-Type: application/octet-stream; name="' . $file . '"' . $eol;
-            $b .= 'Content-Transfer-Encoding: base64' . $eol;
-            $b .= 'Content-Disposition: attachment' . $eol;
-            $b .= $eol.$content.$eol;
-            $body[] = $b;
-        }
-        $body[] = '--';
-        return implode('--'.$separator,$body);
-    }
-
-    public function setHeaderFrom($address) {
-        $this->setHeader('From',$address);
-    }
-
-    protected function setHeader($header, $value=null, $replace=true) {
+    /**
+     * Set header.
+     *
+     * @param string $header
+     * @param string $value
+     * @param bool $replace
+     * @void
+     */
+    protected function setHeader($header, $value='', $replace=true)
+    {
         if (!$replace && !empty($this->headers[mb_strtolower($header)])) return;
         if (($value === null || $value === false) && !empty($this->headers[mb_strtolower($header)])) {
             unset($this->headers[mb_strtolower($header)]);
         } else {
             $this->headers[mb_strtolower($header)] = $header . ': ' . $value;
         }
+    }
+
+    /**
+     * Return correct attachment name.
+     *
+     * @param $attachmentName
+     * @return string
+     */
+    protected function prepareAttachmentName($attachmentName)
+    {
+        $attachmentName = (string)$attachmentName;
+        $attachmentName = preg_replace('/[\\\\\/\:\*\?\"<>]/ui', '_', $attachmentName);
+        if (!$attachmentName) {
+            $attachmentName = 'attachment_'.(count($this->attachments)+1);
+        }
+        return $attachmentName;
+    }
+
+    /**
+     * Set headers of body and return compiled simple body string.
+     *
+     * @return string
+     */
+    protected function getBodySimpleText()
+    {
+        if (!empty($this->body['headers'])) {
+            foreach ($this->body['headers'] as $header => $value) {
+                $this->setHeader($header, $value, true);
+            }
+        }
+        $this->setHeader('Content-type','text/html; charset='.$this->encoding, true);
+        return isset($this->body['content'])?(string)$this->body['content']:'';
+    }
+
+    /**
+     * Set headers of body and return compiled multipart body string.
+     *
+     * @return string
+     */
+    protected function getBodyMultipart()
+    {
+        $separator = md5(time());
+        $eol = "\r\n";
+        $this->setHeader('Content-Type', 'multipart/mixed; boundary="'.$separator.'"', true);
+        $this->setHeader('Content-Transfer-Encoding', '7bit', true);
+        $body[] = null;
+        $b = $eol.'Content-type: text/html; charset='.$this->encoding.$eol;
+        $bits = '7bit';
+        switch ($this->encoding) {
+            case 'utf8':
+                $bits='8bit';
+                break;
+        }
+        $message = isset($this->body['content'])?$this->body['content']:null;
+        $b .= 'Content-Transfer-Encoding: '.$bits.$eol;
+        $b .= $eol.$message.$eol;
+        $body[] = $b;
+        foreach ($this->attachments as $attachment=>$data) {
+            $b = $eol;
+            if (!empty($data['headers'])) {
+                foreach ($data['headers'] as $header=>$value) {
+                    $b .= $header.': '.$value.$eol;
+                }
+            }
+            $content = isset($data['content'])?$data['content']:null;
+            $b .= $eol.$content.$eol;
+            $body[] = $b;
+        }
+        $body[] = '--';
+        return implode('--'.$separator,$body);
     }
 }
