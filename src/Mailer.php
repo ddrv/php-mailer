@@ -59,11 +59,9 @@ class Mailer {
     /**
      * Mailer constructor.
      *
-     * @param string $sender
      */
-    public function __construct($sender='admin@localhost')
+    public function __construct()
     {
-        $this->sender = (string)$sender;
         $this->reset();
     }
 
@@ -72,6 +70,7 @@ class Mailer {
      *
      * @param string $senderEmail
      * @param string $senderName
+     * @void
      */
     public function sender($senderEmail, $senderName='')
     {
@@ -174,6 +173,7 @@ class Mailer {
 
     /**
      * Reset body and headers for nex mail
+     * @void
      */
     protected function reset()
     {
