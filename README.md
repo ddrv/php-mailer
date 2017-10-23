@@ -29,6 +29,11 @@ PHP Class for sending email.
 $mailer = new \Ddrv\Mailer\Mailer();
 
 /**
+ * If need use SMTP server, setting it
+ */
+$mailer->smtp('smtp.host.name',25,'from@host.name','password for from', 'http://host.name');
+
+/**
  * Set sender from@host.name as Site Administrator
  */
 $mailer->sender('from@host.name','Site Administrator');
@@ -54,7 +59,18 @@ $mailer->attachFromString('content','attach1.txt');
 $mailer->attachFromFile('/path/to/file','attach2.txt');
 
 /**
- * Send email to address@host.name
+ * Add addresses
  */
-$mailer->send('address@host.name');
+$mailer->addAddress('address1@host.name', 'My best Friend');
+$mailer->addAddress('address2@host.name', 'My second Friend');
+
+/**
+ * If error, remove address
+ */
+$mailer->removeAddress('address2@host.name');
+
+/**
+ * Send email to addresses
+ */
+$mailer->send();
 ```

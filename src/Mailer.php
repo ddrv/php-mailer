@@ -9,22 +9,31 @@ namespace Ddrv\Mailer;
  * @license  MIT
  * @link     http://ddrv.ru/
  *
- * @property string  $sender
- * @property string  $subject
- * @property array   $headers
- * @property array   $body
- * @property array   $attachments
+ * @property array    $sender
+ * @property string   $subject
+ * @property array    $headers
+ * @property array    $body
+ * @property array    $attachments
+ * @property array    $address
+ * @property string   $log
+ * @property boolean  $smtp
+ * @property resource $socket
  */
 class Mailer {
     /**
      * Version of Mailer
      */
-    const MAILER_VERSION = '2.0.0';
+    const MAILER_VERSION = '2.1.0';
+
+    /**
+     * End of line symbol
+     */
+    const EOL = "\r\n";
 
     /**
      * Send from this Email.
      *
-     * @var string
+     * @var array
      */
     protected $sender;
 
@@ -57,12 +66,81 @@ class Mailer {
     protected $attachments;
 
     /**
+     * Address.
+     *
+     * @var array
+     */
+    protected $address;
+
+    /**
+     * SMTP Socket.
+     *
+     * @var resource
+     */
+    protected $socket;
+
+    /**
+     * use SMTP.
+     *
+     * @var boolean
+     */
+    protected $smtp;
+
+    /**
+     * Log.
+     *
+     * @var string
+     */
+    protected $log;
+
+    /**
      * Mailer constructor.
      *
      */
     public function __construct()
     {
         $this->reset();
+    }
+
+    /**
+     * Mailer destructor.
+     *
+     */
+    public function __destruct()
+    {
+        if ($this->smtp) {
+            $this->smtpCommand('QUIT');
+            $this->socket = null;
+        }
+    }
+
+    /**
+     * Set SMTP.
+     *
+     * @param string $host
+     * @param integer $port
+     * @param string $user
+     * @param string $password
+     * @void
+     */
+    public function smtp($host=null, $port=null, $user=null, $password=null, $domain=null)
+    {
+        $this->smtp = false;
+        $host = (string)$host;
+        $port = (integer)$port;
+        $user = (string)$user;
+        $password = (string)$password;
+        $domain = (string)$domain;
+        if ($host && $port) {
+            $this->smtp = true;
+            $this->socket = fsockopen((string)$host, (int)$port, $errno, $errstr, 30);
+            $test = fgets($this->socket, 512);
+            unset($test);
+            $this->smtpCommand('HELO '.$domain);
+            $this->smtpCommand('AUTH LOGIN');
+            $this->smtpCommand(base64_encode($user));
+            $this->smtpCommand(base64_encode($password));
+        }
     }
 
     /**
@@ -74,12 +152,42 @@ class Mailer {
      */
     public function sender($senderEmail, $senderName='')
     {
-        $this->sender = (string)$senderEmail;
+        $senderEmail = (string)$senderEmail;
         $senderName = (string)$senderName;
-        if ($senderName) {
-            $this->sender .= '<'.$senderName.'>';
+        $this->sender = [
+            'address' => $senderEmail,
+            'name' => $senderName,
+        ];
+        $from = empty($senderName)?'<'.$senderEmail.'>':$senderName.' <'.$senderEmail.'>';
+        $this->setHeader('From', $from, true);
+        $this->setHeader('Reply-To', $from, true);
+    }
+
+    /**
+     * Add address.
+     *
+     * @param string $addressEmail
+     * @param string $addressName
+     * @void
+     */
+    public function addAddress($addressEmail, $addressName='')
+    {
+        $addressEmail = (string)$addressEmail;
+        $addressName = (string)$addressName;
+        $this->address[$addressEmail] = $addressName;
+    }
+
+    /**
+     * Remove address.
+     *
+     * @param string $addressEmail
+     * @void
+     */
+    public function removeAddress($addressEmail)
+    {
+        if (isset($this->address[$addressEmail])) {
+            unset($this->address[$addressEmail]);
         }
-        $this->reset();
     }
 
     /**
@@ -160,15 +268,42 @@ class Mailer {
     /**
      * Send message.
      *
-     * @param string $address
      * @void
      */
-    public function send($address)
+    public function send()
     {
+        if (empty($this->address)) return;
         $body = empty($this->attachments)?$this->getBodySimpleText():$this->getBodyMultipart();
         $headers = implode("\r\n",$this->headers);
-        mail($address, $this->subject, $body, $headers);
+        if ($this->smtp) {
+            $this->smtpCommand('MAIL FROM: <'.$this->sender['address'].'>');
+            foreach ($this->address as $address=>$name) {
+                $this->smtpCommand('RCPT TO: <'.$address.'>');
+            }
+            $this->smtpCommand('DATA');
+            $headers = 'SUBJECT: '.$this->subject.self::EOL.$headers;
+            $data = $headers.self::EOL.self::EOL.$body.self::EOL.'.';
+            $this->smtpCommand($data);
+        } else {
+            $addresses = [];
+            foreach ($this->address as $address=>$name) {
+                $addresses[] = $name.' <'.$address.'>';
+            }
+            $list = implode(',',$addresses);
+            $this->log .= '> mail(\''.$list.'\', \''.$this->subject.'\', \''.$body.'\', \''.$headers.'\');'.PHP_EOL;
+            mail($list, $this->subject, $body, $headers);
+        }
         $this->reset();
+    }
+
+    /**
+     * Return log
+     *
+     * @return string
+     */
+    public function getLog()
+    {
+        return $this->log;
     }
 
     /**
@@ -181,8 +316,7 @@ class Mailer {
         $this->body = [];
         $this->headers = [];
         $this->attachments = [];
-        $this->setHeader('From', $this->sender, false);
-        $this->setHeader('Reply-To', $this->sender, false);
+        $this->address = [];
         $this->setHeader('MIME-Version','1.0', false);
         $this->setHeader('X-Mailer', 'Mailer-'.self::MAILER_VERSION.' (https://github.com/ddrv/mailer)', false);
     }
@@ -245,27 +379,44 @@ class Mailer {
     protected function getBodyMultipart()
     {
         $separator = md5(time());
-        $eol = "\r\n";
         $this->setHeader('Content-Type', 'multipart/mixed; boundary="'.$separator.'"', true);
         $this->setHeader('Content-Transfer-Encoding', '7bit', true);
         $body[] = null;
-        $b = $eol.'Content-type: text/html; charset=utf8'.$eol;
+        $b = self::EOL.'Content-type: text/html; charset=utf8'.self::EOL;
         $message = isset($this->body['content'])?$this->body['content']:null;
-        $b .= 'Content-Transfer-Encoding: 8bit'.$eol;
-        $b .= $eol.$message.$eol;
+        $b .= 'Content-Transfer-Encoding: 8bit'.self::EOL;
+        $b .= self::EOL.$message.self::EOL;
         $body[] = $b;
         foreach ($this->attachments as $attachment=>$data) {
-            $b = $eol;
+            $b = self::EOL;
             if (!empty($data['headers'])) {
                 foreach ($data['headers'] as $header=>$value) {
-                    $b .= $header.': '.$value.$eol;
+                    $b .= $header.': '.$value.self::EOL;
                 }
             }
             $content = isset($data['content'])?$data['content']:null;
-            $b .= $eol.$content.$eol;
+            $b .= self::EOL.$content.self::EOL;
             $body[] = $b;
         }
         $body[] = '--';
         return implode('--'.$separator,$body);
+    }
+
+    /**
+     * Run SMTP Command
+     *
+     * @param $command
+     * @void
+     */
+    protected function smtpCommand($command)
+    {
+        $this->log .= '> ' . $command.PHP_EOL;
+        if ($this->socket) {
+            fputs($this->socket, $command.self::EOL);
+            $response = fgets($this->socket, 512);
+            $this->log .= '< ' . $response.PHP_EOL;
+        } else {
+            $this->log .= '< SMTP socket undefined.'.PHP_EOL;
+        }
     }
 }
