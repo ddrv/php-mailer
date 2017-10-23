@@ -1,3 +1,7 @@
+[![Latest Stable Version](https://poser.pugx.org/ddrv/mailer/v/stable?format=flat-square)](https://packagist.org/packages/ddrv/mailer)
+[![Total Downloads](https://poser.pugx.org/ddrv/mailer/downloads?format=flat-square)](https://packagist.org/packages/ddrv/mailer)
+[![License](https://poser.pugx.org/ddrv/mailer/license?format=flat-square)](https://packagist.org/packages/ddrv/mailer)
+
 # Mailer
 PHP Class for sending email.
 
@@ -73,4 +77,40 @@ $mailer->removeAddress('address2@host.name');
  * Send email to addresses
  */
 $mailer->send();
+```
+
+## Templates
+
+Content of file /path/to/template.tmpl:
+```text
+<h1>This template</h1>
+<p>Hello, {username}!</p>
+<p>This message generated automatically.</p>
+<p>{date}</p>
+```
+
+PHP code:
+```php
+/**
+ * You can using templates for your mails
+ */
+ 
+/**
+ * Add template from string
+ */
+$mailer->addTemplateFromString('tmpl1', '<p>Hello, {username}</p>');
+
+/**
+ * Add template from file
+ */
+$mailer->addTemplateFromFile('tmpl2', '/path/to/template.tmpl');
+
+/**
+ * Set body from template
+ */
+$context = [
+    'username' => 'Anonymous',
+    'date' => date('Y-m-d'),
+];
+$mailer->template('tmpl2',$context);
 ```

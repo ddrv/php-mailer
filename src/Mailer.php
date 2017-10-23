@@ -15,6 +15,7 @@ namespace Ddrv\Mailer;
  * @property array    $body
  * @property array    $attachments
  * @property array    $address
+ * @property array    $templates
  * @property string   $log
  * @property boolean  $smtp
  * @property resource $socket
@@ -23,7 +24,7 @@ class Mailer {
     /**
      * Version of Mailer
      */
-    const MAILER_VERSION = '2.1.0';
+    const MAILER_VERSION = '2.2.0';
 
     /**
      * End of line symbol
@@ -71,6 +72,13 @@ class Mailer {
      * @var array
      */
     protected $address;
+
+    /**
+     * Templates.
+     *
+     * @var array
+     */
+    protected $templates;
 
     /**
      * SMTP Socket.
@@ -202,7 +210,7 @@ class Mailer {
     }
 
     /**
-     * Set body of message.
+     * Set body of message from string.
      *
      * @param string $text
      * @void
@@ -214,6 +222,38 @@ class Mailer {
                 'Content-Type' => 'text/html; charset=utf8',
             ],
             'content' => (string)$text,
+        ];
+    }
+
+    /**
+     * Set body of message from template.
+     *
+     * @param string $key
+     * @param array $context
+     * @void
+     */
+    public function template($key,$context)
+    {
+        $key = (string)$key;
+        $context = (array)$context;
+        if (empty($this->templates[$key]['type'])) return;
+        $text = '';
+        switch ($this->templates[$key]['type']) {
+            case 'string':
+                $text = (string)$this->templates[$key]['tmpl'];
+                break;
+            case 'file':
+                $text = is_readable($this->templates[$key]['tmpl'])?file_get_contents($this->templates[$key]['tmpl']):'';
+                break;
+        }
+        foreach ($context as $placeholder=>$value) {
+            $text = str_replace('{'.$placeholder.'}', $value, $text);
+        }
+        $this->body = [
+            'headers' => [
+                'Content-Type' => 'text/html; charset=utf8',
+            ],
+            'content' => $text,
         ];
     }
 
@@ -304,6 +344,44 @@ class Mailer {
     public function getLog()
     {
         return $this->log;
+    }
+
+    /**
+     * Add template from string
+     *
+     * @param string $key
+     * @param string $template
+     * @void
+     */
+    public function addTemplateFromString($key,$template)
+    {
+        $key = (string)$key;
+        $template = (string)$template;
+        if ($key && $template) {
+            $this->templates[$key] = [
+                'tmpl' => $template,
+                'type' => 'string',
+            ];
+        }
+    }
+
+    /**
+     * Add template from file
+     *
+     * @param string $key
+     * @param string $template
+     * @void
+     */
+    public function addTemplateFromFile($key,$template)
+    {
+        $key = (string)$key;
+        $template = (string)$template;
+        if ($key && is_readable($template)) {
+            $this->templates[$key] = [
+                'tmpl' => $template,
+                'type' => 'file',
+            ];
+        }
     }
 
     /**
