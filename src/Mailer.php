@@ -11,7 +11,6 @@ namespace Ddrv\Mailer;
  *
  * @property string  $sender
  * @property string  $subject
- * @property string  $encoding
  * @property array   $headers
  * @property array   $body
  * @property array   $attachments
@@ -58,22 +57,29 @@ class Mailer {
     protected $attachments;
 
     /**
-     * Encoding of message.
-     *
-     * @var string
-     */
-    protected $encoding = 'utf8';
-
-    /**
      * Mailer constructor.
      *
      * @param string $sender
-     * @param string $encoding
      */
-    public function __construct($sender='admin@localhost', $encoding='utf8')
+    public function __construct($sender='admin@localhost')
     {
         $this->sender = (string)$sender;
-        $this->encoding = preg_replace('/[^a-z0-9]/ui','',mb_strtolower((string)$encoding));
+        $this->reset();
+    }
+
+    /**
+     * Set sender.
+     *
+     * @param string $senderEmail
+     * @param string $senderName
+     */
+    public function sender($senderEmail, $senderName='')
+    {
+        $this->sender = (string)$senderEmail;
+        $senderName = (string)$senderName;
+        if ($senderName) {
+            $this->sender .= '<'.$senderName.'>';
+        }
         $this->reset();
     }
 
@@ -98,7 +104,7 @@ class Mailer {
     {
         $this->body = [
             'headers' => [
-                'Content-Type' => 'text/html; charset='.$this->encoding,
+                'Content-Type' => 'text/html; charset=utf8',
             ],
             'content' => (string)$text,
         ];
@@ -227,7 +233,7 @@ class Mailer {
                 $this->setHeader($header, $value, true);
             }
         }
-        $this->setHeader('Content-type','text/html; charset='.$this->encoding, true);
+        $this->setHeader('Content-type','text/html; charset=utf8', true);
         return isset($this->body['content'])?(string)$this->body['content']:'';
     }
 
@@ -243,15 +249,9 @@ class Mailer {
         $this->setHeader('Content-Type', 'multipart/mixed; boundary="'.$separator.'"', true);
         $this->setHeader('Content-Transfer-Encoding', '7bit', true);
         $body[] = null;
-        $b = $eol.'Content-type: text/html; charset='.$this->encoding.$eol;
-        $bits = '7bit';
-        switch ($this->encoding) {
-            case 'utf8':
-                $bits='8bit';
-                break;
-        }
+        $b = $eol.'Content-type: text/html; charset=utf8'.$eol;
         $message = isset($this->body['content'])?$this->body['content']:null;
-        $b .= 'Content-Transfer-Encoding: '.$bits.$eol;
+        $b .= 'Content-Transfer-Encoding: 8bit'.$eol;
         $b .= $eol.$message.$eol;
         $body[] = $b;
         foreach ($this->attachments as $attachment=>$data) {

@@ -25,10 +25,13 @@ PHP Class for sending email.
 ```php
 /**
  * Inititalization Mailer class. 
- * Sender must be from@host.name
- * Encoding of mail must be UTF-8
  */
-$mailer = new \Ddrv\Mailer\Mailer('from@host.name','utf8');
+$mailer = new \Ddrv\Mailer\Mailer();
+
+/**
+ * Set sender from@host.name as Site Administrator
+ */
+$mailer->sender('from@host.name','Site Administrator');
 
 /**
  * Set subject of mail
