@@ -1,6 +1,8 @@
-[![Latest Stable Version](https://poser.pugx.org/ddrv/mailer/v/stable?format=flat-square)](https://packagist.org/packages/ddrv/mailer)
-[![Total Downloads](https://poser.pugx.org/ddrv/mailer/downloads?format=flat-square)](https://packagist.org/packages/ddrv/mailer)
-[![License](https://poser.pugx.org/ddrv/mailer/license?format=flat-square)](https://packagist.org/packages/ddrv/mailer)
+[![Latest Stable Version](https://img.shields.io/packagist/v/ddrv/mailer.svg?style=flat-square)](https://packagist.org/packages/ddrv/mailer)
+[![Total Downloads](https://img.shields.io/packagist/dt/ddrv/mailer.svg?style=flat-square)](https://packagist.org/packages/ddrv/mailer/stats)
+[![License](https://img.shields.io/packagist/l/ddrv/mailer.svg?style=flat-square)](https://github.com/ddrv/mailer/blob/master/LICENSE.md)
+[![PHP](https://img.shields.io/packagist/php-v/ddrv/mailer.svg?style=flat-square)](https://php.net)
+
 
 # Mailer
 PHP Class for sending email.
@@ -24,7 +26,7 @@ PHP Class for sending email.
     require_once('/path/to/libraries/mailer/src/Mailer.php');
     ```
 
-#Usage
+# Usage
 
 ```php
 /**
