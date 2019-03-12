@@ -2,7 +2,6 @@
 
 namespace Ddrv\Mailer\Transport;
 
-use Ddrv\Mailer\Book;
 use Ddrv\Mailer\Message;
 
 final class Smtp implements TransportInterface
@@ -55,27 +54,15 @@ final class Smtp implements TransportInterface
         }
     }
 
-    public function send(Message $message, Book $addresses)
+    public function send(Message $message, $recipients)
     {
+        $message->setHeader('From', $this->sender);
         $this->smtpCommand("MAIL FROM: <{$this->sender}>");
-        $headers = "{$message->getHeadersLine()}\r\nTo: {$addresses->getContacts()}";
-        foreach ($addresses as $address) {
-            $this->smtpCommand("RCPT TO: <{$address->getEmail()}>");
-        }
-        $cc = $message->getCC();
-        if (!$cc->isEmpty()) {
-            foreach ($cc as $address) {
-                $this->smtpCommand("RCPT TO: <{$address->getEmail()}>");
-            }
-        }
-        $bcc = $message->getBCC();
-        if (!$bcc->isEmpty()) {
-            foreach ($bcc as $address) {
-                $this->smtpCommand("RCPT TO: <{$address->getEmail()}>");
-            }
+        $headers = $message->getHeadersLine();
+        foreach ($recipients as $address) {
+            $this->smtpCommand("RCPT TO: <$address>");
         }
         $this->smtpCommand("DATA");
-
         $this->smtpCommand("$headers\r\n\r\n{$message->getBody()}\r\n.");
         return true;
     }

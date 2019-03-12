@@ -26,24 +26,12 @@ final class Message
     private $attachments = array();
 
     /**
-     * @var Book
-     */
-    private $cc;
-
-    /**
-     * @var Book
-     */
-    private $bcc;
-
-    /**
      * @var string
      */
     private $boundary;
 
-    public function __construct(Address $sender, $subject, $message, $isHtml = true)
+    public function __construct($subject, $message, $isHtml = true)
     {
-        $this->cc = new Book();
-        $this->bcc = new Book();
         $this->subject = (string)$subject;
         $this->message = array(
             'content' => base64_encode($message),
@@ -51,13 +39,17 @@ final class Message
         );
         $this->boundary = md5(time());
         $this->setHeader('MIME-Version','1.0');
-        $this->setHeader('From', $sender->getContact());
     }
 
     public function setHeader($header, $value)
     {
         $header = (string)$header;
-        $this->headers[mb_strtolower($header)] = $header . ': ' . (string)$value;
+        $value = (string)$value;
+        if ($value) {
+            $this->headers[mb_strtolower($header)] = $header . ': ' . $value;
+        } else {
+            $this->removeHeader($header);
+        }
         return $this;
     }
 
@@ -135,16 +127,7 @@ final class Message
             $this->setHeader('Content-Type', 'multipart/mixed; boundary="'.$this->boundary.'"');
             $this->setHeader('Content-Transfer-Encoding', '7bit');
         }
-        $this->removeHeader('to');
-        $this->removeHeader('cc');
-        $this->removeHeader('bcc');
         $headers = implode("\r\n", $this->headers);
-        if (!$this->cc->isEmpty()) {
-            $headers .= "\r\nCC: {$this->cc->getContacts()}";
-        }
-        if (!$this->bcc->isEmpty()) {
-            $headers .= "\r\nBCC: {$this->bcc->getContacts()}";
-        }
         return $headers;
     }
 
@@ -171,37 +154,6 @@ final class Message
         }
         return $body;
     }
-
-    public function addCC($email, $name = '')
-    {
-        $this->cc->add(new Address($email, $name));
-    }
-
-    public function removeCC($email)
-    {
-        $this->cc->remove(new Address($email));
-    }
-
-    public function getCC()
-    {
-        return $this->cc;
-    }
-
-    public function addBCC($email, $name = '')
-    {
-        $this->bcc->add(new Address($email, $name));
-    }
-
-    public function removeBCC($email)
-    {
-        $this->bcc->remove(new Address($email));
-    }
-
-    public function getBCC()
-    {
-        return $this->bcc;
-    }
-
 
     /**
      * Return correct attachment name.

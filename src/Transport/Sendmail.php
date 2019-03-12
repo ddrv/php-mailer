@@ -10,25 +10,21 @@ final class Sendmail implements TransportInterface
 
     private $options;
 
-    public function __construct($options = '')
+    private $sender;
+
+    public function __construct($sender, $options = '')
     {
+        $this->sender = $sender;
         $this->options = (string)$options;
     }
 
-    public function send(Message $message, Book $addresses)
+    public function send(Message $message, $recipients)
     {
+        $message->setHeader('From', $this->sender);
         $subject = $message->getSubject();
         $body = $message->getBody();
-        $headers = $headers = "{$message->getHeadersLine()}\r\nTo: {$addresses->getContacts()}";
-        $rcpt = array();
-        $rcpt[] = $addresses->getContacts();
-        if (!$message->getCC()->isEmpty()) {
-            $rcpt[] = $message->getCC()->getContacts();
-        }
-        if (!$message->getBCC()->isEmpty()) {
-            $rcpt[] = $message->getBCC()->getContacts();
-        }
-        $to = implode(', ', $rcpt);
+        $headers = $message->getHeadersLine();
+        $to = implode(', ', $recipients);
         return mail($to, $subject, $body, $headers, $this->options);
     }
 }

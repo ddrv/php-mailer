@@ -2,7 +2,6 @@
 
 namespace Ddrv\Mailer\Transport;
 
-use Ddrv\Mailer\Book;
 use Ddrv\Mailer\Message;
 
 interface TransportInterface
@@ -11,9 +10,9 @@ interface TransportInterface
      * Send mail
      *
      * @param Message $message
-     * @param Book $addresses
+     * @param string[] $recipients
      * @return bool
      */
-    public function send(Message $message, Book $addresses);
+    public function send(Message $message, $recipients);
 }
 

@@ -15,7 +15,7 @@ final class Mailer
 
     const MAILER_VERSION = '3.0.0-beta';
 
-    const DEFAULT_CHANNEL = 'default';
+    const CHANNEL_DEFAULT = 'default';
 
     const TRANSPORT_SENDMAIL = 'sendmail';
     const TRANSPORT_SMTP     = 'smtp';
@@ -34,7 +34,7 @@ final class Mailer
      */
     public function __construct($transport = self::TRANSPORT_SENDMAIL, $options = array())
     {
-        $this->setChannel(self::DEFAULT_CHANNEL, $transport, $options);
+        $this->setChannel(self::CHANNEL_DEFAULT, $transport, $options);
     }
 
     /**
@@ -65,7 +65,8 @@ final class Mailer
                 break;
             default:
                 $opt = array_key_exists('options', $options)?(string)$options['options']:'';
-                $connect = new Sendmail($opt);
+                $sender = array_key_exists('sender', $options)?(string)$options['sender']:'';
+                $connect = new Sendmail($sender, $opt);
         }
         $this->channels[$name] = $connect;
     }
@@ -77,7 +78,7 @@ final class Mailer
     public function removeChannel($name)
     {
         $name = (string)$name;
-        if ($name == self::DEFAULT_CHANNEL) {
+        if ($name == self::CHANNEL_DEFAULT) {
             throw new ChannelCantBeRemovedException($name);
         }
         unset($this->channels[$name]);
@@ -85,26 +86,41 @@ final class Mailer
 
     /**
      * @param Message $message
-     * @param Book $addresses
-     * @param bool $personal
+     * @param string[] $to
      * @param string $channel
      * @throws ChannelNotExistsException
      */
-    public function send(Message $message, Book $addresses, $personal = false, $channel = self::DEFAULT_CHANNEL)
+    public function send(Message $message, $to, $channel = self::CHANNEL_DEFAULT)
     {
-        $message->setHeader('X-Mailer', 'ddrv/mailer-'.self::MAILER_VERSION.' (https://github.com/ddrv/mailer)');
+        foreach ($to as $address) {
+            $message
+                ->removeHeader('To')
+                ->removeHeader('CC')
+                ->removeHeader('BCC')
+            ;
+            $this->mass($message, array($address), array(), array(), $channel);
+        }
+    }
+
+    /**
+     * @param Message $message
+     * @param string[] $to
+     * @param string[] $cc
+     * @param string[] $bcc
+     * @param string $channel
+     * @throws ChannelNotExistsException
+     */
+    public function mass(Message $message, $to, $cc = array(), $bcc = array(), $channel = self::CHANNEL_DEFAULT)
+    {
         $channel = (string)$channel;
         if (!array_key_exists($channel, $this->channels)) {
             throw new ChannelNotExistsException($channel);
         }
-        if ($personal) {
-            foreach ($addresses as $address) {
-                $recipient = new Book();
-                $recipient->add($address);
-                $this->channels[$channel]->send($message, $recipient);
-            }
-        } else {
-            $this->channels[$channel]->send($message, $addresses);
-        }
+        $message->setHeader('X-Mailer', 'ddrv/mailer-'.self::MAILER_VERSION.' (https://github.com/ddrv/mailer)');
+        $message->setHeader('To', implode(',', $to));
+        $message->setHeader('CC', implode(',', $cc));
+        $message->setHeader('BCC', implode(',', $bcc));
+        $addresses = array_unique(array_merge($to, $cc, $bcc));
+        $this->channels[$channel]->send($message, $addresses);
     }
 }
