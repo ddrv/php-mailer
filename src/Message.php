@@ -26,19 +26,32 @@ final class Message
     private $attachments = array();
 
     /**
+     * @var Book
+     */
+    private $cc;
+
+    /**
+     * @var Book
+     */
+    private $bcc;
+
+    /**
      * @var string
      */
     private $boundary;
 
-    public function __construct($from, $subject, $message, $isHtml = true)
+    public function __construct(Address $sender, $subject, $message, $isHtml = true)
     {
-        $this->setSender($from);
+        $this->cc = new Book();
+        $this->bcc = new Book();
         $this->subject = (string)$subject;
         $this->message = array(
-            'content' => (string)$message,
+            'content' => base64_encode($message),
             'mime' => $isHtml ? 'text/html' : 'text/plain',
         );
         $this->boundary = md5(time());
+        $this->setHeader('MIME-Version','1.0');
+        $this->setHeader('From', $sender->getContact());
     }
 
     public function setHeader($header, $value)
@@ -107,24 +120,6 @@ final class Message
         return $this;
     }
 
-    /**
-     * Set sender.
-     *
-     * @param string $email
-     * @param string $name
-     * @void
-     */
-    public function setSender($email, $name='')
-    {
-        $email = (string)$email;
-        $name = trim((string)$name);
-        $from = '';
-        if ($name) $from .= $name.' ';
-        $from .= "<$email>";
-        $this->setHeader('From', $from);
-        $this->setHeader('Reply-To', $from);
-    }
-
     public function getSubject()
     {
         return $this->subject;
@@ -132,33 +127,43 @@ final class Message
 
     public function getHeadersLine()
     {
+        $this->setHeader('Subject', $this->subject);
         if (empty($this->attachments)) {
             $this->setHeader('Content-Type', $this->message['mime'] . '; charset=utf8');
-            $this->setHeader('Content-Transfer-Encoding', '8bit');
+            $this->setHeader('Content-Transfer-Encoding', 'base64');
         } else {
             $this->setHeader('Content-Type', 'multipart/mixed; boundary="'.$this->boundary.'"');
             $this->setHeader('Content-Transfer-Encoding', '7bit');
         }
+        $this->removeHeader('to');
+        $this->removeHeader('cc');
+        $this->removeHeader('bcc');
         $headers = implode("\r\n", $this->headers);
+        if (!$this->cc->isEmpty()) {
+            $headers .= "\r\nCC: {$this->cc->getContacts()}";
+        }
+        if (!$this->bcc->isEmpty()) {
+            $headers .= "\r\nBCC: {$this->bcc->getContacts()}";
+        }
         return $headers;
     }
 
     public function getBody()
     {
         if (empty($this->attachments)) {
-            $body = $this->message['content'];
+            $body = chunk_split($this->message['content']);
         } else {
             $parts[] = null;
             $part = "\r\nContent-type: text/html; charset=utf8\r\n";
-            $part .= "Content-Transfer-Encoding: 8bit\r\n\r\n";
-            $part .= "{$this->message['content']}\r\n";
+            $part .= "Content-Transfer-Encoding: base64\r\n\r\n";
+            $part .= chunk_split($this->message['content'])."\r\n";
             $parts[] = $part;
             foreach ($this->attachments as $name => $attachment) {
 
                 $part = "\r\nContent-type: {$attachment['mime']}; name=$name\r\n";
                 $part .= "Content-Transfer-Encoding: base64\r\n";
                 $part .= "Content-Disposition: attachment\r\n\r\n";
-                $part .= chunk_split($this->message['content'])."\r\n";
+                $part .= chunk_split($attachment['content'])."\r\n";
                 $parts[] = $part;
             }
             $parts[] = '--';
@@ -167,6 +172,35 @@ final class Message
         return $body;
     }
 
+    public function addCC($email, $name = '')
+    {
+        $this->cc->add(new Address($email, $name));
+    }
+
+    public function removeCC($email)
+    {
+        $this->cc->remove(new Address($email));
+    }
+
+    public function getCC()
+    {
+        return $this->cc;
+    }
+
+    public function addBCC($email, $name = '')
+    {
+        $this->bcc->add(new Address($email, $name));
+    }
+
+    public function removeBCC($email)
+    {
+        $this->bcc->remove(new Address($email));
+    }
+
+    public function getBCC()
+    {
+        return $this->bcc;
+    }
 
 
     /**

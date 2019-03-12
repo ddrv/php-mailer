@@ -2,41 +2,109 @@
 
 namespace Ddrv\Mailer;
 
-use Ddrv\Mailer\Sender\Legacy;
-use Ddrv\Mailer\Sender\SenderInterface;
-use Ddrv\Mailer\Sender\Smtp;
+use Ddrv\Mailer\Exception\ChannelCantBeRemovedException;
+use Ddrv\Mailer\Exception\ChannelIsExistsException;
+use Ddrv\Mailer\Exception\ChannelNotExistsException;
+use Ddrv\Mailer\Transport\Fake;
+use Ddrv\Mailer\Transport\Sendmail;
+use Ddrv\Mailer\Transport\TransportInterface;
+use Ddrv\Mailer\Transport\Smtp;
 
 final class Mailer
 {
 
+    const MAILER_VERSION = '3.0.0-beta';
+
+    const DEFAULT_CHANNEL = 'default';
+
+    const TRANSPORT_SENDMAIL = 'sendmail';
+    const TRANSPORT_SMTP     = 'smtp';
+    const TRANSPORT_NULL     = 'null';
+
     /**
-     * @var SenderInterface
+     * @var TransportInterface[]
      */
-    private $sender;
+    private $channels = array();
 
-    public function __construct()
+    /**
+     * Mailer constructor.
+     * @param string $transport
+     * @param array $options
+     * @throws ChannelIsExistsException
+     */
+    public function __construct($transport = self::TRANSPORT_SENDMAIL, $options = array())
     {
-        $this->legacy();
+        $this->setChannel(self::DEFAULT_CHANNEL, $transport, $options);
     }
 
-    public function legacy($options = '')
+    /**
+     * @param string $name
+     * @param string $transport
+     * @param array $options
+     * @throws ChannelIsExistsException
+     */
+    public function setChannel($name, $transport, $options = array())
     {
-        $this->sender = new Legacy($options);
+        $name = (string)$name;
+        if (array_key_exists($name, $this->channels)) {
+            throw new ChannelIsExistsException($name);
+        }
+        switch ($transport) {
+            case self::TRANSPORT_NULL:
+                $connect = new Fake();
+                break;
+            case self::TRANSPORT_SMTP:
+                $host = array_key_exists('host', $options)?(string)$options['host']:'';
+                $port = array_key_exists('port', $options)?(string)$options['port']:'';
+                $username = array_key_exists('username', $options)?(string)$options['username']:'';
+                $password = array_key_exists('password', $options)?(string)$options['password']:'';
+                $domain = array_key_exists('domain', $options)?(string)$options['domain']:'';
+                $sender = array_key_exists('sender', $options)?(string)$options['sender']:'';
+                $encrypt = array_key_exists('encrypt', $options)?(string)$options['encrypt']:null;
+                $connect = new Smtp($host, $port, $username, $password, $sender, $encrypt, $domain);
+                break;
+            default:
+                $opt = array_key_exists('options', $options)?(string)$options['options']:'';
+                $connect = new Sendmail($opt);
+        }
+        $this->channels[$name] = $connect;
     }
 
-    public function smtp($host, $port, $user, $password, $sender, $encryption, $domain='')
+    /**
+     * @param string $name
+     * @throws ChannelCantBeRemovedException
+     */
+    public function removeChannel($name)
     {
-        $this->sender = new Smtp($host, $port, $user, $password, $sender, $encryption, $domain);
+        $name = (string)$name;
+        if ($name == self::DEFAULT_CHANNEL) {
+            throw new ChannelCantBeRemovedException($name);
+        }
+        unset($this->channels[$name]);
     }
 
-    public function send(Message $message, $addresses, $personal = false)
+    /**
+     * @param Message $message
+     * @param Book $addresses
+     * @param bool $personal
+     * @param string $channel
+     * @throws ChannelNotExistsException
+     */
+    public function send(Message $message, Book $addresses, $personal = false, $channel = self::DEFAULT_CHANNEL)
     {
+        $message->setHeader('X-Mailer', 'ddrv/mailer-'.self::MAILER_VERSION.' (https://github.com/ddrv/mailer)');
+        $channel = (string)$channel;
+        if (!array_key_exists($channel, $this->channels)) {
+            throw new ChannelNotExistsException($channel);
+        }
         if ($personal) {
             foreach ($addresses as $address) {
-                $this->sender->send($message, array($address));
+                $recipient = new Book();
+                $recipient->add($address);
+                $this->channels[$channel]->send($message, $recipient);
             }
         } else {
-            $this->sender->send($message, $addresses);
+            $this->channels[$channel]->send($message, $addresses);
         }
     }
 }

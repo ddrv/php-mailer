@@ -1,10 +1,11 @@
 <?php
 
-namespace Ddrv\Mailer\Sender;
+namespace Ddrv\Mailer\Transport;
 
+use Ddrv\Mailer\Book;
 use Ddrv\Mailer\Message;
 
-final class Smtp implements SenderInterface
+final class Smtp implements TransportInterface
 {
 
     const ENCRYPTION_TLS = 'tls';
@@ -54,14 +55,27 @@ final class Smtp implements SenderInterface
         }
     }
 
-    public function send(Message $message, $addresses)
+    public function send(Message $message, Book $addresses)
     {
         $this->smtpCommand("MAIL FROM: <{$this->sender}>");
+        $headers = "{$message->getHeadersLine()}\r\nTo: {$addresses->getContacts()}";
         foreach ($addresses as $address) {
-            $this->smtpCommand("RCPT TO: <$address>");
+            $this->smtpCommand("RCPT TO: <{$address->getEmail()}>");
+        }
+        $cc = $message->getCC();
+        if (!$cc->isEmpty()) {
+            foreach ($cc as $address) {
+                $this->smtpCommand("RCPT TO: <{$address->getEmail()}>");
+            }
+        }
+        $bcc = $message->getBCC();
+        if (!$bcc->isEmpty()) {
+            foreach ($bcc as $address) {
+                $this->smtpCommand("RCPT TO: <{$address->getEmail()}>");
+            }
         }
         $this->smtpCommand("DATA");
-        $headers = "SUBJECT: {$message->getSubject()}\r\n{$message->getHeadersLine()}";
+
         $this->smtpCommand("$headers\r\n\r\n{$message->getBody()}\r\n.");
         return true;
     }
@@ -76,8 +90,10 @@ final class Smtp implements SenderInterface
     {
         $response = false;
         if ($this->socket) {
+            echo '>'.$command.PHP_EOL;
             fputs($this->socket, $command."\r\n");
             $response = fgets($this->socket, 512);
+            echo '<'.$response.PHP_EOL;
         }
         return $response;
     }
