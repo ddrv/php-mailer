@@ -11,108 +11,68 @@ PHP Class for sending email.
 ## With [Composer](https://getcomposer.org/)
 1. Run in console:
     ```text
-    php composer.phar require ddrv/mailer
-    php composer.phar install
+    php composer.phar require ddrv/mailer:~3
     ```
 1. Include autoload file
     ```php
     require_once('vendor/autoload.php');
     ```
-## Manually install
-1. Download [Archive](https://github.com/ddrv/mailer/archive/master.zip)
-1. Unzip archive to /path/to/libraries/
-1. Include files
-    ```php
-    require_once('/path/to/libraries/mailer/src/Mailer.php');
-    ```
 
 # Usage
 
 ```php
-/**
- * Inititalization Mailer class. 
+<?php
+
+/*
+ * Initialization Mailer class. 
  */
 $mailer = new \Ddrv\Mailer\Mailer();
 
-/**
+/*
  * If need use SMTP server, setting it
  */
-$mailer->smtp('smtp.host.name',25,'from@host.name','password for from', 'http://host.name');
+$mailer->smtp(
+    'smtp.host.name',    // host
+    25,                  // port
+    'from@host.name',    // login
+    'password for from', // password
+    'from@host.name',    // sender
+    null,                // encryption: 'tls', 'ssl' or null
+    'http://host.name'   // domain
+);
 
-/**
- * Set sender from@host.name as Site Administrator
+/*
+ * If need switch provider back to mail() function, use 
  */
-$mailer->sender('from@host.name','Site Administrator');
+$mailer->legacy('-f');
 
-/**
- * Set subject of mail
+/*
+ * Create message
  */
-$mailer->subject('Subject of mail');
+$message = new \Ddrv\Mailer\Message('from@host.name', 'subject', '<p>Simple text</p>', true);
 
-/**
- * Add text of mail in HTML format
+/*
+ * You can set named sender from@host.name as Site Administrator
  */
-$mailer->body('<p>Simple text</p>');
+$message->setSender('from@host.name', 'Site Administrator');
 
-/**
- * In need adding attachment from string, run
+/*
+ * If need adding attachment from string, run
  */
-$mailer->attachFromString('content','attach1.txt');
+$message->attachFromString('attach1.txt', 'content', 'text/plain');
 
-/**
- * In need adding attachment from file, run
+/*
+ * If need adding attachment from file, run
  */
-$mailer->attachFromFile('/path/to/file','attach2.txt');
+$message->attachFromFile('attach2.txt', '/path/to/file');
 
-/**
- * Add addresses
+/*
+ * Send email to addresses (one mail for all addresses)
  */
-$mailer->addAddress('address1@host.name', 'My best Friend');
-$mailer->addAddress('address2@host.name', 'My second Friend');
+$mailer->send($message, array('email1@host.name', 'email2@host.name'));
 
-/**
- * If error, remove address
+/*
+ * or send personal mailing one mail per addresses
  */
-$mailer->removeAddress('address2@host.name');
-
-/**
- * Send email to addresses
- */
-$mailer->send();
-```
-
-## Templates
-
-Content of file /path/to/template.tmpl:
-```text
-<h1>This template</h1>
-<p>Hello, {username}!</p>
-<p>This message generated automatically.</p>
-<p>{date}</p>
-```
-
-PHP code:
-```php
-/**
- * You can using templates for your mails
- */
- 
-/**
- * Add template from string
- */
-$mailer->addTemplateFromString('tmpl1', '<p>Hello, {username}</p>');
-
-/**
- * Add template from file
- */
-$mailer->addTemplateFromFile('tmpl2', '/path/to/template.tmpl');
-
-/**
- * Set body from template
- */
-$context = [
-    'username' => 'Anonymous',
-    'date' => date('Y-m-d'),
-];
-$mailer->template('tmpl2',$context);
+$mailer->send($message, array('email1@host.name', 'email2@host.name', true));
 ```
