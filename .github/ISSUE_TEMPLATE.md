@@ -8,7 +8,7 @@
 
 | Q                | A
 | ---------------- | ---
-| Mailer version   | 2.?
+| Mailer version   | 3.0.?
 | PHP version      | 5.?
 | Operating system |
 
