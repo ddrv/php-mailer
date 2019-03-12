@@ -93,11 +93,6 @@ final class Mailer
     public function send(Message $message, $to, $channel = self::CHANNEL_DEFAULT)
     {
         foreach ($to as $address) {
-            $message
-                ->removeHeader('To')
-                ->removeHeader('CC')
-                ->removeHeader('BCC')
-            ;
             $this->mass($message, array($address), array(), array(), $channel);
         }
     }

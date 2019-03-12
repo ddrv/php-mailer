@@ -6,6 +6,7 @@ use Ddrv\Mailer\Message;
 
 interface TransportInterface
 {
+
     /**
      * Send mail
      *
