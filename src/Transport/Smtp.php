@@ -1,15 +1,15 @@
 <?php
 
-namespace Ddrv\Mailer\Sender;
+namespace Ddrv\Mailer\Transport;
 
 use Ddrv\Mailer\Message;
 
-final class Smtp implements SenderInterface
+final class Smtp implements TransportInterface
 {
 
-    const ENCRYPTION_TLS = 'tls';
+    const ENCRYPTION_TLS = "tls";
 
-    const ENCRYPTION_SSL = 'ssl';
+    const ENCRYPTION_SSL = "ssl";
 
     /**
      * @var resource
@@ -22,6 +22,11 @@ final class Smtp implements SenderInterface
     private $sender;
 
     /**
+     * @var callable
+     */
+    private $logger;
+
+    /**
      * Smtp constructor.
      * @param string $host
      * @param int $port
@@ -31,7 +36,7 @@ final class Smtp implements SenderInterface
      * @param string $encryption
      * @param string $domain
      */
-    public function __construct($host, $port, $user, $password, $sender, $encryption=self::ENCRYPTION_TLS, $domain='')
+    public function __construct($host, $port, $user, $password, $sender, $encryption=self::ENCRYPTION_TLS, $domain="")
     {
         $this->sender = $sender;
         $host = (string)$host;
@@ -41,7 +46,7 @@ final class Smtp implements SenderInterface
         $domain = (string)$domain;
         if ($host && $port) {
             if (in_array($encryption, array(self::ENCRYPTION_TLS, self::ENCRYPTION_SSL))) {
-                $host = $encryption.'://'.$host;
+                $host = "$encryption://$host";
             }
             $this->socket = fsockopen((string)$host, (int)$port, $errCode, $errMessage, 30);
             $test = fgets($this->socket, 512);
@@ -54,16 +59,21 @@ final class Smtp implements SenderInterface
         }
     }
 
-    public function send(Message $message, $addresses)
+    public function send(Message $message, $recipients)
     {
         $this->smtpCommand("MAIL FROM: <{$this->sender}>");
-        foreach ($addresses as $address) {
+        $headers = $message->getHeadersLine();
+        foreach ($recipients as $address) {
             $this->smtpCommand("RCPT TO: <$address>");
         }
         $this->smtpCommand("DATA");
-        $headers = "SUBJECT: {$message->getSubject()}\r\n{$message->getHeadersLine()}";
         $this->smtpCommand("$headers\r\n\r\n{$message->getBody()}\r\n.");
         return true;
+    }
+
+    public function getSender()
+    {
+        return $this->sender;
     }
 
 
@@ -76,8 +86,16 @@ final class Smtp implements SenderInterface
     {
         $response = false;
         if ($this->socket) {
+            if (is_callable($this->logger)) {
+                $logger = $this->logger;
+                $logger("> $command");
+            }
             fputs($this->socket, $command."\r\n");
             $response = fgets($this->socket, 512);
+            if (is_callable($this->logger)) {
+                $logger = $this->logger;
+                $logger("< $response");
+            }
         }
         return $response;
     }
@@ -86,5 +104,10 @@ final class Smtp implements SenderInterface
     {
         $this->smtpCommand("QUIT");
         fclose($this->socket);
+    }
+
+    public function setLogger(callable $logger)
+    {
+        $this->logger = $logger;
     }
 }

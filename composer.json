@@ -9,8 +9,8 @@
         "ext-fileinfo": "Mime-Type detecting"
     },
     "type": "library",
-    "description": "PHP Class for sending email",
-    "keywords": ["email", "mail", "send", "attachments", "smtp"],
+    "description": "PHP library for sending email",
+    "keywords": ["email", "mail", "send", "attachments", "smtp", "sendmail"],
     "license": "MIT",
     "authors": [
         {
