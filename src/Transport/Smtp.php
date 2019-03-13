@@ -7,9 +7,9 @@ use Ddrv\Mailer\Message;
 final class Smtp implements TransportInterface
 {
 
-    const ENCRYPTION_TLS = 'tls';
+    const ENCRYPTION_TLS = "tls";
 
-    const ENCRYPTION_SSL = 'ssl';
+    const ENCRYPTION_SSL = "ssl";
 
     /**
      * @var resource
@@ -22,6 +22,11 @@ final class Smtp implements TransportInterface
     private $sender;
 
     /**
+     * @var callable
+     */
+    private $logger;
+
+    /**
      * Smtp constructor.
      * @param string $host
      * @param int $port
@@ -31,7 +36,7 @@ final class Smtp implements TransportInterface
      * @param string $encryption
      * @param string $domain
      */
-    public function __construct($host, $port, $user, $password, $sender, $encryption=self::ENCRYPTION_TLS, $domain='')
+    public function __construct($host, $port, $user, $password, $sender, $encryption=self::ENCRYPTION_TLS, $domain="")
     {
         $this->sender = $sender;
         $host = (string)$host;
@@ -41,7 +46,7 @@ final class Smtp implements TransportInterface
         $domain = (string)$domain;
         if ($host && $port) {
             if (in_array($encryption, array(self::ENCRYPTION_TLS, self::ENCRYPTION_SSL))) {
-                $host = $encryption.'://'.$host;
+                $host = "$encryption://$host";
             }
             $this->socket = fsockopen((string)$host, (int)$port, $errCode, $errMessage, 30);
             $test = fgets($this->socket, 512);
@@ -56,7 +61,6 @@ final class Smtp implements TransportInterface
 
     public function send(Message $message, $recipients)
     {
-        $message->setHeader('From', $this->sender);
         $this->smtpCommand("MAIL FROM: <{$this->sender}>");
         $headers = $message->getHeadersLine();
         foreach ($recipients as $address) {
@@ -65,6 +69,11 @@ final class Smtp implements TransportInterface
         $this->smtpCommand("DATA");
         $this->smtpCommand("$headers\r\n\r\n{$message->getBody()}\r\n.");
         return true;
+    }
+
+    public function getSender()
+    {
+        return $this->sender;
     }
 
 
@@ -77,10 +86,16 @@ final class Smtp implements TransportInterface
     {
         $response = false;
         if ($this->socket) {
-            echo '>'.$command.PHP_EOL;
+            if (is_callable($this->logger)) {
+                $logger = $this->logger;
+                $logger("> $command");
+            }
             fputs($this->socket, $command."\r\n");
             $response = fgets($this->socket, 512);
-            echo '<'.$response.PHP_EOL;
+            if (is_callable($this->logger)) {
+                $logger = $this->logger;
+                $logger("< $response");
+            }
         }
         return $response;
     }
@@ -89,5 +104,10 @@ final class Smtp implements TransportInterface
     {
         $this->smtpCommand("QUIT");
         fclose($this->socket);
+    }
+
+    public function setLogger(callable $logger)
+    {
+        $this->logger = $logger;
     }
 }

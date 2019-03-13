@@ -15,5 +15,16 @@ interface TransportInterface
      * @return bool
      */
     public function send(Message $message, $recipients);
+
+    /**
+     * @return string
+     */
+    public function getSender();
+
+    /**
+     * @param callable $logger
+     * @return void
+     */
+    public function setLogger(callable $logger);
 }
 

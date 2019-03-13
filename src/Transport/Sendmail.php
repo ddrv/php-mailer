@@ -2,7 +2,6 @@
 
 namespace Ddrv\Mailer\Transport;
 
-use Ddrv\Mailer\Book;
 use Ddrv\Mailer\Message;
 
 final class Sendmail implements TransportInterface
@@ -11,8 +10,12 @@ final class Sendmail implements TransportInterface
     private $options;
 
     private $sender;
+    /**
+     * @var callable
+     */
+    private $logger;
 
-    public function __construct($sender, $options = '')
+    public function __construct($sender, $options = "")
     {
         $this->sender = $sender;
         $this->options = (string)$options;
@@ -20,11 +23,31 @@ final class Sendmail implements TransportInterface
 
     public function send(Message $message, $recipients)
     {
-        $message->setHeader('From', $this->sender);
         $subject = $message->getSubject();
         $body = $message->getBody();
         $headers = $message->getHeadersLine();
-        $to = implode(', ', $recipients);
+        $to = implode(", ", $recipients);
+        if (is_callable($this->logger)) {
+            $logger = $this->logger;
+            $log = "mail(";
+            $log .= "\"".addslashes($to)."\", ";
+            $log .= "\"".addslashes($subject)."\", ";
+            $log .= "\"".addslashes($body)."\", ";
+            $log .= "\"".addslashes($headers)."\", ";
+            $log .= "\"".addslashes($this->options)."\", ";
+            $log .= ");";
+            $logger($log);
+        }
         return mail($to, $subject, $body, $headers, $this->options);
+    }
+
+    public function getSender()
+    {
+        return $this->sender;
+    }
+
+    public function setLogger(callable $logger)
+    {
+        $this->logger = $logger;
     }
 }

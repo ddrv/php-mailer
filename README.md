@@ -25,46 +25,71 @@ PHP library for sending email.
 <?php
 
 /*
- * Initialization Mailer class with SMTP transport
+ * Step 1. Initialization transport
+ * --------------------------------
  */
-$mailer = new \Ddrv\Mailer\Mailer(
-    'smtp',
-    array(
-        'host'     => 'smtp.fight.club',  // host
-        'port'     => 25,                 // port
-        'username' => 'joe',              // login
-        'password' => 'IAmJoesLiver',     // password
-        'sender'   => 'joe@fight.club',   // sender
-        'encrypt'  => null,               // encryption: 'tls', 'ssl' or null
-        'domain'   => 'http://fight.club' // domain
-    )
+
+/*
+ * a. Sendmail
+ */
+$transport = new \Ddrv\Mailer\Transport\Sendmail(
+    'joe@fight.club',   // sender
+    '-f'                // sendmail options
 );
 
 /*
- * Initialization Mailer class with sendmail transport
+ * b. SMTP
  */
-$mailer = new \Ddrv\Mailer\Mailer(
-    'sendmail',
-    array(
-        'options'     => '-f', // sendmail options
-    )
+$transport = new \Ddrv\Mailer\Transport\Smtp(
+    'smtp.fight.club',  // host
+    25,                 // port
+    'joe',              // login
+    'IAmJoesLiver',     // password
+    'joe@fight.club',   // sender
+    null,               // encryption: 'tls', 'ssl' or null
+    'http://fight.club' // domain
 );
 
+/*
+ * c. Fake (emulation send emails)
+ */
+
+$transport = new \Ddrv\Mailer\Transport\Fake();
 
 /*
- * Create message
+ * d. Other. You can implement Ddrv\Mailer\Transport\TransportInterface interface 
  */
-$sender = new \Ddrv\Mailer\Address('joe@fight.club', 'Incognito');
+
+/*
+ * Step 2. Initialization Mailer
+ * -----------------------------
+ */
+$mailer = new \Ddrv\Mailer\Mailer($transport);
+
+/*
+ * Step 3. Create message
+ * ----------------------
+ */
+
+$text = <<<HTML
+<h1>Welcome to Fight Club</h1>
+<p>Please, read our rules in attachments</p>
+HTML;
+ 
 
 $message = new \Ddrv\Mailer\Message(
-    $sender,     // sender email
-    'Fight Club',            // subject of message
-    '<p>Welcome to the Fight Club</p>', // text of message
-    true                  // true for html, false for plain text
+    'Fight Club', // subject of message
+    $text,        // text of message
+    true          // true for html, false for plain text
 );
 
 /*
- * If need adding attachment from string, run
+ * Step 4. Attachments
+ * -------------------
+ */
+
+/*
+ * a. Creating attachment from string
  */
 $rules = <<<TEXT
 1. You don't talk about fight club.
@@ -78,35 +103,57 @@ $rules = <<<TEXT
 TEXT;
 
 $message->attachFromString(
-    'fight-club-rules.txt', // attachment name
-    $rules, // content
-    'text/plain'   // content-type
+    'fight-club.txt', // attachment name
+    $rules,           // content
+    'text/plain'      // content-type
 );
 
 /*
- * If need adding attachment from file, run
+ * b. Creating attachments from file
  */
+
+$path = '/home/tyler/docs/projects/mayhem/rules.txt';
+
 $message->attachFromFile(
-    'project-mayhem-rules.txt',  // attachment name
-    '/home/tyler/docs/projects/mayhem/rules.txt' // path to attached file
+    'project-mayhem.txt',  // attachment name
+     $path                 // path to attached file
 );
 
 /*
- * Create recipients
+ * Step 5. Add contacts names (OPTIONAL)
  */
-$recipients = new \Ddrv\Mailer\Book();
-$recipients->add(new \Ddrv\Mailer\Address('tyler@fight.club', 'Tyler Durden'));
-$recipients->add(new \Ddrv\Mailer\Address('angel@fight.club', 'Angel Face'));
-$recipients->add(new \Ddrv\Mailer\Address('bob@fight.club', 'Robert Paulson'));
 
+$mailer->addContact('tyler@fight.club', 'Tyler Durden');
+$mailer->addContact('angel@fight.club', 'Angel Face');
+$mailer->addContact('bob@fight.club', 'Robert Paulson');
 
 /*
- * Send email to addresses
+ * Step 6. Send mail
+ * -----------------
  */
+
+/*
+ * a. Personal mailing (one mail per address)
+ */
+
 $mailer->send(
-    $message,     // message
-    $recipients,  // recipients
-    false         // false for group mailing (one mail for all addresses), true for personal mailing (one mail per address)
+    $message,
+    array(
+        'tyler@fight.club',
+        'angel@fight.club',
+        'bob@fight.club',
+    )
+);
+
+/*
+ * b. Mass mailing (one mail to all addresses)
+ */
+
+$mailer->mass(
+    $message,
+    array('tyler@fight.club'), // recipients
+    array('angel@fight.club'), // CC (carbon copy)
+    array('bob@fight.club')    // BCC (blind carbon copy)
 );
 ```
 
@@ -117,85 +164,125 @@ You can add some channels for sending.
 ```php
 <?php
 
-// create default channel
-$mailer = new \Ddrv\Mailer\Mailer(
-    'smtp',
-    array(
-        'host'     => 'smtp.host.name',
-        'port'     => 25,
-        'username' => 'no-reply@host.name',
-        'password' => 'password',
-        'sender'   => 'no-reply@host.name',
-        'encrypt'  => 'tls',
-        'domain'   => 'http://host.name'
-    )
+$default = new \Ddrv\Mailer\Transport\Sendmail('user@host.name');
+
+$noreply = new \Ddrv\Mailer\Transport\Smtp(
+    'smtp.host.name',
+    25,
+    'no-reply@host.name',
+    'password',
+    'no-reply@host.name',
+    'tls',
+    'http://host.name'
 );
 
-// create support channel
-$mailer->setChannel(
-    'support',
-    'smtp',
-    array(
-        'host'     => 'smtp.host.name',
-        'port'     => 25,
-        'username' => 'support@host.name',
-        'password' => 'password',
-        'sender'   => 'support@host.name',
-        'encrypt'  => null,
-        'domain'   => 'http://host.name'
-    )
+$support = new \Ddrv\Mailer\Transport\Smtp(
+    'smtp.host.name',
+    25,
+    'support@host.name',
+    'password',
+    'support@host.name',
+    null,
+    'http://host.name'
 );
 
-$sender1 = new \Ddrv\Mailer\Address('no-reply@host.name', 'Informer');
+// channel name is \Ddrv\Mailer\Mailer::CHANNEL_DEFAULT.
+// You can define your channel name in second parameter
+// for example: $mailer = new \Ddrv\Mailer\Mailer($default, 'channel');
+$mailer = new \Ddrv\Mailer\Mailer($default);
+$mailer->setChannel($noreply, 'noreply');
+$mailer->setChannel($support, 'support');
+
+$mailer->addContact('no-reply@host.name', 'Informer');
+$mailer->addContact('support@host.name', 'Support Agent');
+
 $msg1 = new \Ddrv\Mailer\Message(
-    $sender1,
     'host.name: your account registered',
     'Your account registered! Please do not reply to this email',
     false
 );
 
-$sender2 = new \Ddrv\Mailer\Address('support@host.name', 'Support Agent');
 $msg2 = new \Ddrv\Mailer\Message(
-    $sender2,
     'host.name: ticket #4221 closed',
     '<p>Ticket #4221 closed</p>',
     true
 );
 
-$rcpt1 = new \Ddrv\Mailer\Book();
-$rcpt1->add(new \Ddrv\Mailer\Address('recipient1@host.name', 'Recipient First'));
-$rcpt1->add(new \Ddrv\Mailer\Address('recipient2@host.name'));
+$mailer->addContact('recipient1@host.name', 'Recipient First');
+$mailer->addContact('recipient2@host.name', 'Recipient Second');
+$mailer->addContact('recipient3@host.name', 'Other Recipient');
 
-$rcpt2 = new \Ddrv\Mailer\Book();
-$rcpt2->add(new \Ddrv\Mailer\Address('recipient3@host.name', 'Other Recipient'));
+$recipients1 = array(
+    'recipient1@host.name',
+    'recipient2@host.name'
+);
+$recipients2 = array(
+    'recipient2@host.name',
+    'recipient3@host.name'
+);
 
-$mailer->send($msg1, $rcpt1, true); // send to default channel
-$mailer->send($msg2, $rcpt2, true, 'support'); // send to support channel
+/*
+ * Send to channel
+ * -----------------------
+ */
+$mailer->send(
+    $msg1,        // message
+    $recipients1, // recipients
+    'noreply'    // channel name
+);
+
+$mailer->send(
+    $msg2,        // message
+    $recipients2, // recipients
+    'support'     // channel name
+); 
+
+/*
+ * Send to some channels
+ */
+$mailer->send(
+    $msg2,                      // message
+    $recipients2,               // recipients
+    array('support', 'noreply') // channels
+); 
+
+/*
+ * Send to all channels
+ */
+$mailer->send($msg2, $recipients2, \Ddrv\Mailer\Mailer::CHANNEL_ALL); 
+
+/*
+ * CAUTION!
+ * If the channel does not exists, the call well be skipped
+ */
+
+// If you need clear memory, you may clear contacts
+
+$mailer->clearContacts();
+
 ```
 
-# CC and BCC
+# Logging
 
 ```php
-
 <?php
 
-$msg = new \Ddrv\Mailer\Message(
-    new \Ddrv\Mailer\Address('no-reply@host.name', 'Informer'),
-    'host.name: your account registered',
-    'Your account registered! Please do not reply to this email',
-    false
+$support = new \Ddrv\Mailer\Transport\Sendmail('support@host.name');
+$noreply = new \Ddrv\Mailer\Transport\Sendmail('noreply@host.name');
+$default = new \Ddrv\Mailer\Transport\Sendmail('default@host.name');
+$mailer = new \Ddrv\Mailer\Mailer($support, 'support');
+$mailer->setChannel($noreply, 'noreply');
+$mailer->setChannel($default, 'default');
+
+/**
+ * @var Psr\Log\LoggerInterface $logger
+ */
+
+$mailer->setLogger(
+    function ($log) use ($logger) {
+        $logger->info($log);
+    },
+    array('noreply', 'support') // channels
 );
-$msg->addCC('cc1@host.name', 'User Name');
-$msg->addCC('cc2@host.name');
-
-$msg->addBCC('bcc1@host.name', 'User Name');
-$msg->addBCC('bcc2@host.name');
-
-$rcpt = new \Ddrv\Mailer\Book();
-$rcpt->add(new \Ddrv\Mailer\Address('recipient@host.name', 'Recipient'));
-
-$mailer->send($msg, $rcpt);
 
 ```
-
-
