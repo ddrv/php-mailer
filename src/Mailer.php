@@ -62,36 +62,40 @@ final class Mailer
 
     /**
      * @param Message $message
-     * @param string[] $to
+     * @param string[]|string $to
      * @param string[]|string $channels
      * @throws RecipientsListEmptyException
      */
     public function send(Message $message, $to, $channels = self::CHANNEL_ALL)
     {
-        foreach ($to as $address) {
+        $arrTo = (array)$to;
+        foreach ($arrTo as $address) {
             $this->mass($message, array($address), array(), array(), $channels);
         }
     }
 
     /**
      * @param Message $message
-     * @param string[] $to
-     * @param string[] $cc
-     * @param string[] $bcc
+     * @param string[]|string $to
+     * @param string[]|string $cc
+     * @param string[]|string $bcc
      * @param string[]|string $channels
      * @throws RecipientsListEmptyException
      */
     public function mass(Message $message, $to, $cc = array(), $bcc = array(), $channels = self::CHANNEL_ALL)
     {
-        $addresses = $this->getEmails(array_merge($to, $cc, $bcc));
+        $arrTo = (array)$to;
+        $arrCc = (array)$cc;
+        $arrBcc = (array)$bcc;
+        $addresses = $this->getEmails(array_merge($arrTo, $arrCc, $arrBcc));
         if (!$addresses) {
             throw new RecipientsListEmptyException();
         }
         $version = self::MAILER_VERSION;
         $message->setHeader("X-Mailer", "ddrv/mailer-$version (https://github.com/ddrv/mailer)");
-        $message->setHeader("To", implode(", ", $this->getContacts($to)));
-        $message->setHeader("Cc", implode(", ", $this->getContacts($cc)));
-        $message->setHeader("Bcc", implode(", ", $this->getContacts($bcc)));
+        $message->setHeader("To", implode(", ", $this->getContacts($arrTo)));
+        $message->setHeader("Cc", implode(", ", $this->getContacts($arrCc)));
+        $message->setHeader("Bcc", implode(", ", $this->getContacts($arrBcc)));
 
         $ch = $this->getChannels($channels);
         foreach ($ch as $transport) {

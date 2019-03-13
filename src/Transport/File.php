@@ -43,7 +43,7 @@ final class File implements TransportInterface
             if (!is_dir($dir)) mkdir($dir, 0775, true);
             $num = 1;
             do {
-                $prefix = "mail_" . date(DATE_ATOM);
+                $prefix = "mail_" . date("YmdHis");
                 $suffix = str_pad($num, 3, "0", STR_PAD_LEFT);
                 $file = implode(DIRECTORY_SEPARATOR, array($dir, "{$prefix}_{$suffix}.eml"));
                 $num++;
