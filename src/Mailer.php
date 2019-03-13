@@ -10,7 +10,7 @@ use Ddrv\Mailer\Transport\TransportInterface;
 final class Mailer
 {
 
-    const MAILER_VERSION = "3.0.0-beta";
+    const MAILER_VERSION = "3.1.0";
 
     const CHANNEL_DEFAULT = "default";
     const CHANNEL_ALL     = "*";
