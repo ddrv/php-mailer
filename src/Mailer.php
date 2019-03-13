@@ -119,7 +119,14 @@ final class Mailer
 
     public function clearContacts()
     {
-        $this->contacts = array();
+        $senders = array();
+        foreach ($this->channels as $transport) {
+            $email = $transport->getSender();
+            if (array_key_exists($email, $this->contacts)) {
+                $senders[$email] = $this->contacts[$email];
+            }
+        }
+        $this->contacts = $senders;
     }
 
     /**
