@@ -9,6 +9,7 @@
 | Q                | A
 | ---------------- | ---
 | Mailer version   | 3.0.?
+| Mailer transport | `sendmail`, `smtp`, etc
 | PHP version      | 5.?
 | Operating system |
 
