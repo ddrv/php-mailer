@@ -2,6 +2,7 @@
 
 namespace Ddrv\Mailer\Transport;
 
+use Closure;
 use Ddrv\Mailer\Message;
 
 interface TransportInterface
@@ -22,9 +23,9 @@ interface TransportInterface
     public function getSender();
 
     /**
-     * @param callable $logger
+     * @param Closure $logger
      * @return void
      */
-    public function setLogger(callable $logger);
+    public function setLogger(Closure $logger);
 }
 

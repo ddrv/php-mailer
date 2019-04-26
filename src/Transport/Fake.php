@@ -2,6 +2,7 @@
 
 namespace Ddrv\Mailer\Transport;
 
+use Closure;
 use Ddrv\Mailer\Message;
 
 final class Fake implements TransportInterface
@@ -27,7 +28,7 @@ final class Fake implements TransportInterface
         return "";
     }
 
-    public function setLogger(callable $logger)
+    public function setLogger(Closure $logger)
     {
         $this->logger = $logger;
     }

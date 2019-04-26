@@ -2,6 +2,7 @@
 
 namespace Ddrv\Mailer\Transport;
 
+use Closure;
 use Ddrv\Mailer\Message;
 
 final class File implements TransportInterface
@@ -58,7 +59,7 @@ final class File implements TransportInterface
         return $this->sender;
     }
 
-    public function setLogger(callable $logger)
+    public function setLogger(Closure $logger)
     {
         $this->logger = $logger;
     }

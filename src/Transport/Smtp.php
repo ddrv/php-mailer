@@ -2,6 +2,7 @@
 
 namespace Ddrv\Mailer\Transport;
 
+use Closure;
 use Ddrv\Mailer\Message;
 
 final class Smtp implements TransportInterface
@@ -106,7 +107,7 @@ final class Smtp implements TransportInterface
         fclose($this->socket);
     }
 
-    public function setLogger(callable $logger)
+    public function setLogger(Closure $logger)
     {
         $this->logger = $logger;
     }
