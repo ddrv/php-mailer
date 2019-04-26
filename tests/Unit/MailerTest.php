@@ -32,6 +32,9 @@ class MailerTest extends TestCase
         parent::setUp();
         $this->factory = new MessageFactory();
         $this->transport = new MockTransport();
+        $this->transport->setLogger(function($log) {
+            echo $log.PHP_EOL.PHP_EOL.PHP_EOL.PHP_EOL;
+        });
         $this->mailer = new Mailer(new MemorySpool($this->transport));
     }
 

@@ -2,6 +2,7 @@
 
 namespace Ddrv\Mailer;
 
+use Closure;
 use Ddrv\Mailer\Exception\RecipientsListEmptyException;
 
 interface TransportInterface
@@ -17,9 +18,9 @@ interface TransportInterface
     public function send(Message $message);
 
     /**
-     * @param callable $logger
+     * @param Closure $logger
      * @return void
      */
-    public function setLogger(callable $logger);
+    public function setLogger(Closure $logger);
 }
 

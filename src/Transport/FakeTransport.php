@@ -2,6 +2,7 @@
 
 namespace Ddrv\Mailer\Transport;
 
+use Closure;
 use Ddrv\Mailer\Exception\RecipientsListEmptyException;
 use Ddrv\Mailer\Message;
 use Ddrv\Mailer\TransportInterface;
@@ -27,7 +28,7 @@ final class FakeTransport implements TransportInterface
         return true;
     }
 
-    public function setLogger(callable $logger)
+    public function setLogger(Closure $logger)
     {
         $this->logger = $logger;
     }

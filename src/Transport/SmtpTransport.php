@@ -2,6 +2,7 @@
 
 namespace Ddrv\Mailer\Transport;
 
+use Closure;
 use Ddrv\Mailer\Exception\RecipientsListEmptyException;
 use Ddrv\Mailer\Message;
 use Ddrv\Mailer\TransportInterface;
@@ -81,9 +82,9 @@ final class SmtpTransport implements TransportInterface
     }
 
     /**
-     * @param callable $logger
+     * @param Closure $logger
      */
-    public function setLogger(callable $logger)
+    public function setLogger(Closure $logger)
     {
         $this->logger = $logger;
     }

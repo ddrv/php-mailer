@@ -2,6 +2,7 @@
 
 namespace Ddrv\Mailer\Transport;
 
+use Closure;
 use Ddrv\Mailer\Exception\RecipientsListEmptyException;
 use Ddrv\Mailer\Message;
 use Ddrv\Mailer\TransportInterface;
@@ -47,7 +48,7 @@ final class SendmailTransport implements TransportInterface
         return mail($to, $subject, $body, $headers, $this->options);
     }
 
-    public function setLogger(callable $logger)
+    public function setLogger(Closure $logger)
     {
         $this->logger = $logger;
     }
