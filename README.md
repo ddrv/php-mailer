@@ -11,7 +11,7 @@ PHP library for sending email.
 ## With [Composer](https://getcomposer.org/)
 1. Run in console:
     ```text
-    php composer.phar require ddrv/mailer:~3
+    php composer.phar require ddrv/mailer:~4.0
     ```
 1. Include autoload file
     ```php
@@ -24,6 +24,14 @@ PHP library for sending email.
 ```php
 <?php
 
+use \Ddrv\Mailer\Transport\SendmailTransport;
+use \Ddrv\Mailer\Transport\SmtpTransport;
+use \Ddrv\Mailer\Transport\FakeTransport;
+use \Ddrv\Mailer\Spool\MemorySpool;
+use \Ddrv\Mailer\Spool\FileSpool;
+use \Ddrv\Mailer\Mailer;
+use \Ddrv\Mailer\Message;
+
 /*
  * Step 1. Initialization transport
  * --------------------------------
@@ -32,15 +40,14 @@ PHP library for sending email.
 /*
  * a. Sendmail
  */
-$transport = new \Ddrv\Mailer\Transport\Sendmail(
-    'joe@fight.club',   // sender
+$transport = new SendmailTransport(
     '-f'                // sendmail options
 );
 
 /*
  * b. SMTP
  */
-$transport = new \Ddrv\Mailer\Transport\Smtp(
+$transport = new SmtpTransport(
     'smtp.fight.club',  // host
     25,                 // port
     'joe',              // login
@@ -54,37 +61,72 @@ $transport = new \Ddrv\Mailer\Transport\Smtp(
  * c. Fake (emulation send emails)
  */
 
-$transport = new \Ddrv\Mailer\Transport\Fake();
+$transport = new FakeTransport();
 
 /*
  * d. Other. You can implement Ddrv\Mailer\Transport\TransportInterface interface 
  */
 
 /*
- * Step 2. Initialization Mailer
+ * Step 2. Initialization spool
  * -----------------------------
  */
-$mailer = new \Ddrv\Mailer\Mailer($transport);
 
 /*
- * Step 3. Create message
- * ----------------------
+ * a. File spool. 
+ */
+$spool = new FileSpool($transport, sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'mail');
+
+/*
+ * b. Memory spool. 
+ */
+$spool = new MemorySpool($transport);
+
+/*
+ * c. Other. You can implement Ddrv\Mailer\SpoolInterface interface 
  */
 
-$text = <<<HTML
+/*
+ * Step 3. Initialization Mailer
+ * -----------------------------
+ */
+$mailer = new Mailer($spool);
+
+// If you need a replace header "From" in all messages, set your sender in second parameter 
+$mailer = new Mailer($spool, "Fight Club Informer <info@fight.club>");
+
+/*
+ * Step 4. Create message
+ * ----------------------
+ */
+ 
+
+$message1 = new Message(
+    'Test message',           // subject of message
+    '<h1>Hello, world!</h1>', // html body
+    'Hello, world!'           // plain body
+);
+$message1->addTo('recipient@example.com', 'My Friend');
+
+$html = <<<HTML
 <h1>Welcome to Fight Club</h1>
 <p>Please, read our rules in attachments</p>
 HTML;
- 
 
-$message = new \Ddrv\Mailer\Message(
-    'Fight Club', // subject of message
-    $text,        // text of message
-    true          // true for html, false for plain text
-);
+$text = <<<TEXT
+Welcome to Fight Club
+Please, read our rules in attachments
+TEXT;
+
+$message2 = new Message();
+$message2
+    ->setSubject('Fight Club')
+    ->setHtmlBody($html)
+    ->setPlainBody($text)
+;
 
 /*
- * Step 4. Attachments
+ * Step 5. Attachments
  * -------------------
  */
 
@@ -102,7 +144,7 @@ $rules = <<<TEXT
 8. If this is your first night at fight club, you have to fight.
 TEXT;
 
-$message->attachFromString(
+$message2->attachFromString(
     'fight-club.txt', // attachment name
     $rules,           // content
     'text/plain'      // content-type
@@ -111,178 +153,52 @@ $message->attachFromString(
 /*
  * b. Creating attachments from file
  */
-
 $path = '/home/tyler/docs/projects/mayhem/rules.txt';
 
-$message->attachFromFile(
+$message2->attachFromFile(
     'project-mayhem.txt',  // attachment name
      $path                 // path to attached file
 );
 
 /*
- * Step 5. Add contacts names (OPTIONAL)
+ * Step 6. Add recipients
  */
-
-$mailer->addContact('tyler@fight.club', 'Tyler Durden');
-$mailer->addContact('angel@fight.club', 'Angel Face');
-$mailer->addContact('bob@fight.club', 'Robert Paulson');
+$message2->addTo('tyler@fight.club', 'Tyler Durden');
+$message2->addCc('bob@fight.club', 'Robert Paulson');
+$message2->addBcc('angel@fight.club', 'Angel Face');
 
 /*
- * Step 6. Send mail
+ * Step 7. Send mail
  * -----------------
  */
 
 /*
- * a. Personal mailing (one mail per address)
+ * a. Simple send to all recipients
  */
-
-$mailer->send(
-    $message,
-    array(
-        'tyler@fight.club',
-        'angel@fight.club',
-        'bob@fight.club',
-    )
-);
+$mailer->send($message1);
 
 /*
- * b. Mass mailing (one mail to all addresses)
+ * b. Spooling
+ * For add message to spool, you need set second parameter as positive integer
  */
+$mailer->send($message1, 2);
+$mailer->send($message2, 1);
 
-$mailer->mass(
-    $message,
-    array('tyler@fight.club'), // recipients
-    array('angel@fight.club'), // CC (carbon copy)
-    array('bob@fight.club')    // BCC (blind carbon copy)
-);
-```
-
-# Channels
-
-You can add some channels for sending.
-
-```php
-<?php
-
-$default = new \Ddrv\Mailer\Transport\Sendmail('user@host.name');
-
-$noreply = new \Ddrv\Mailer\Transport\Smtp(
-    'smtp.host.name',
-    25,
-    'no-reply@host.name',
-    'password',
-    'no-reply@host.name',
-    'tls',
-    'http://host.name'
-);
-
-$support = new \Ddrv\Mailer\Transport\Smtp(
-    'smtp.host.name',
-    25,
-    'support@host.name',
-    'password',
-    'support@host.name',
-    null,
-    'http://host.name'
-);
-
-// channel name is \Ddrv\Mailer\Mailer::CHANNEL_DEFAULT.
-// You can define your channel name in second parameter
-// for example: $mailer = new \Ddrv\Mailer\Mailer($default, 'channel');
-$mailer = new \Ddrv\Mailer\Mailer($default);
-$mailer->setChannel($noreply, 'noreply');
-$mailer->setChannel($support, 'support');
-
-$mailer->addContact('no-reply@host.name', 'Informer');
-$mailer->addContact('support@host.name', 'Support Agent');
-
-$msg1 = new \Ddrv\Mailer\Message(
-    'host.name: your account registered',
-    'Your account registered! Please do not reply to this email',
-    false
-);
-
-$msg2 = new \Ddrv\Mailer\Message(
-    'host.name: ticket #4221 closed',
-    '<p>Ticket #4221 closed</p>',
-    true
-);
-
-$mailer->addContact('recipient1@host.name', 'Recipient First');
-$mailer->addContact('recipient2@host.name', 'Recipient Second');
-$mailer->addContact('recipient3@host.name', 'Other Recipient');
-
-$recipients1 = array(
-    'recipient1@host.name',
-    'recipient2@host.name'
-);
-$recipients2 = array(
-    'recipient2@host.name',
-    'recipient3@host.name'
-);
+// Send from spool.
+$mailer->flush();
 
 /*
- * Send to channel
- * -----------------------
+ * You can set limit for send messages from spool
  */
-$mailer->send(
-    $msg1,        // message
-    $recipients1, // recipients
-    'noreply'    // channel name
-);
-
-$mailer->send(
-    $msg2,        // message
-    $recipients2, // recipients
-    'support'     // channel name
-); 
+$mailer->flush(5);
 
 /*
- * Send to some channels
+ * Step 8. Personal mailing
+ * You can send one message with many recipient as many mails per recipient 
+ * (messages will be without CC fnd BCC headers and include only one email on To header).
  */
-$mailer->send(
-    $msg2,                      // message
-    $recipients2,               // recipients
-    array('support', 'noreply') // channels
-); 
+$mailer->personal($message2); // without spool
+// or
+$mailer->personal($message2, 1); // with spool
+$mailer->flush();
 
-/*
- * Send to all channels
- */
-$mailer->send($msg2, $recipients2, \Ddrv\Mailer\Mailer::CHANNEL_ALL); 
-
-/*
- * CAUTION!
- * If the channel does not exists, the call well be skipped
- */
-
-// If you need clear memory, you may clear contacts
-
-$mailer->clearContacts();
-
-```
-
-# Logging
-
-```php
-<?php
-
-$support = new \Ddrv\Mailer\Transport\Sendmail('support@host.name');
-$noreply = new \Ddrv\Mailer\Transport\Sendmail('noreply@host.name');
-$default = new \Ddrv\Mailer\Transport\Sendmail('default@host.name');
-$mailer = new \Ddrv\Mailer\Mailer($support, 'support');
-$mailer->setChannel($noreply, 'noreply');
-$mailer->setChannel($default, 'default');
-
-/**
- * @var Psr\Log\LoggerInterface $logger
- */
-
-$mailer->setLogger(
-    function ($log) use ($logger) {
-        $logger->info($log);
-    },
-    array('noreply', 'support') // channels
-);
-
-```

@@ -2,207 +2,85 @@
 
 namespace Ddrv\Mailer;
 
-use Ddrv\Mailer\Exception\ChannelCantBeRemovedException;
-use Ddrv\Mailer\Exception\ChannelIsExistsException;
-use Ddrv\Mailer\Exception\RecipientsListEmptyException;
-use Ddrv\Mailer\Transport\TransportInterface;
+use Throwable;
 
 final class Mailer
 {
 
-    const MAILER_VERSION = "3.1.1";
-
-    const CHANNEL_DEFAULT = "default";
-    const CHANNEL_ALL     = "*";
+    const MAILER_VERSION = "4.0.0";
 
     /**
-     * @var TransportInterface[]
+     * @var SpoolInterface
      */
-    private $channels = array();
+    private $spool;
 
-    private $contacts = array();
+    /**
+     * @var string
+     */
+    private $from;
 
     /**
      * Mailer constructor.
-     * @param TransportInterface $transport
-     * @param string $name
-     * @throws ChannelIsExistsException
+     * @param SpoolInterface $spool
+     * @param string $from
      */
-    public function __construct(TransportInterface $transport, $name = self::CHANNEL_DEFAULT)
+    public function __construct(SpoolInterface $spool, $from = "")
     {
-        $this->setChannel($transport, $name);
+        $this->spool = $spool;
+        $this->from = $from;
     }
 
-    /**
-     * @param TransportInterface $transport
-     * @param string $name
-     * @throws ChannelIsExistsException
-     */
-    public function setChannel(TransportInterface $transport, $name)
+    public function flush($limit = 0)
     {
-        $name = (string)$name;
-        if (array_key_exists($name, $this->channels) || $name == self::CHANNEL_ALL) {
-            throw new ChannelIsExistsException($name);
-        }
-        $this->channels[$name] = $transport;
-    }
-
-    /**
-     * @param string $name
-     * @throws ChannelCantBeRemovedException
-     */
-    public function removeChannel($name)
-    {
-        $name = (string)$name;
-        if (in_array($name, array(self::CHANNEL_DEFAULT, self::CHANNEL_ALL))) {
-            throw new ChannelCantBeRemovedException($name);
-        }
-        unset($this->channels[$name]);
+        $this->spool->flush($limit);
     }
 
     /**
      * @param Message $message
-     * @param string[]|string $to
-     * @param string[]|string $channels
-     * @throws RecipientsListEmptyException
+     * @param int $priority
+     * @return self
      */
-    public function send(Message $message, $to, $channels = self::CHANNEL_ALL)
+    public function send(Message $message, $priority = 0)
     {
-        $arrTo = (array)$to;
-        foreach ($arrTo as $address) {
-            $this->mass($message, array($address), array(), array(), $channels);
-        }
+        return $this->sendMail($message, false, $priority);
     }
 
     /**
      * @param Message $message
-     * @param string[]|string $to
-     * @param string[]|string $cc
-     * @param string[]|string $bcc
-     * @param string[]|string $channels
-     * @throws RecipientsListEmptyException
+     * @param int $priority
+     * @return self
      */
-    public function mass(Message $message, $to, $cc = array(), $bcc = array(), $channels = self::CHANNEL_ALL)
+    public function personal(Message $message, $priority = 0)
     {
-        $arrTo = (array)$to;
-        $arrCc = (array)$cc;
-        $arrBcc = (array)$bcc;
-        $addresses = $this->getEmails(array_merge($arrTo, $arrCc, $arrBcc));
-        if (!$addresses) {
-            throw new RecipientsListEmptyException();
-        }
-        $version = self::MAILER_VERSION;
-        $message->setHeader("X-Mailer", "ddrv/mailer-$version (https://github.com/ddrv/mailer)");
-        $message->setHeader("To", implode(", ", $this->getContacts($arrTo)));
-        $message->setHeader("Cc", implode(", ", $this->getContacts($arrCc)));
-        $message->setHeader("Bcc", implode(", ", $this->getContacts($arrBcc)));
-
-        $ch = $this->getChannels($channels);
-        foreach ($ch as $transport) {
-            $sender = $transport->getSender();
-            $contact = $this->getContact($sender);
-            $message->setHeader("From", $contact);
-            $transport->send($message, $addresses);
-        }
-    }
-
-    public function addContact($email, $name)
-    {
-        $email = (string)$email;
-        $name = preg_replace("/[^\pL\s\,\.\d]/ui", "", (string)$name);
-        if (!$email || !$name) return false;
-        if (!$this->checkEmail($email)) return false;
-        if (preg_match("/[\,\.]/ui", $name)) $name = "\"$name\"";
-        $this->contacts[$email] = "$name <$email>";
-        return true;
-    }
-
-    public function clearContacts()
-    {
-        $senders = array();
-        foreach ($this->channels as $transport) {
-            $email = $transport->getSender();
-            if (array_key_exists($email, $this->contacts)) {
-                $senders[$email] = $this->contacts[$email];
-            }
-        }
-        $this->contacts = $senders;
+        return $this->sendMail($message, true, $priority);
     }
 
     /**
-     * @param callable $logger
-     * @param string[]|string $channels
+     * @param Message $message
+     * @param bool $personal
+     * @param int $priority
+     * @return self
      */
-    public function setLogger(callable $logger, $channels = self::CHANNEL_ALL)
+    private function sendMail(Message $message, $personal = false, $priority = 1)
     {
-        $ch = $this->getChannels($channels);
-        foreach ($ch as $transport) {
-            $transport->setLogger($logger);
-        }
-    }
-
-    private function checkEmail($email)
-    {
-        $arr = explode("@", $email);
-        return (count($arr) == 2 && !empty($arr[0]) && !empty($arr[1]));
-    }
-
-    private function getEmails($emails)
-    {
-        $emails = array_unique($emails);
-        $result = array();
-        foreach ($emails as $email) {
-            if ($this->checkEmail($email)) {
-                $result[] = $email;
-            }
-        }
-        return $result;
-    }
-
-    private function getContacts($emails)
-    {
-        $emails = array_unique($emails);
-        $result = array();
-        foreach ($emails as $email) {
-            $contact = $this->getContact($email);
-            if ($contact) $result[] = $contact;
-        }
-        return $result;
-    }
-
-    private function getContact($email)
-    {
-        if (array_key_exists($email, $this->contacts)) {
-            return $this->contacts[$email];
-        } elseif ($this->checkEmail($email)) {
-            return "<$email>";
-        }
-        return false;
-    }
-
-    /**
-     * @param string|array $channels
-     * @return TransportInterface[]
-     */
-    private function getChannels($channels)
-    {
-        $result = array();
-        $all = (
-            (is_string($channels) && $channels == self::CHANNEL_ALL)
-            || (is_array($channels) && in_array(self::CHANNEL_ALL, $channels))
-        );
-        if ($all) {
-            $ch = array_keys($this->channels);
+        if ($this->from) $message->setHeader("From", $this->from);
+        $priority = (int)$priority;
+        $params = array();
+        if ($priority < 1) $priority = 0;
+        if ($priority) {
+            $fn = array($this->spool, "add");
+            $params[1] = $priority;
         } else {
-            $ch = (array)$channels;
+            $fn = array($this->spool, "send");
         }
-        foreach ($ch as $channel) {
-            if (array_key_exists($channel, $this->channels)) {
-                $result[$channel] = $this->channels[$channel];
-            }
+        $messages = $personal ? $message->getPersonalMessages() : array($message);
+        foreach ($messages as $msg) {
+            $params[0] = $msg;
+            ksort($params);
+            try {
+                call_user_func_array($fn, $params);
+            } catch (Throwable $e) {}
         }
-        return array_values($result);
+        return $this;
     }
-
-
 }

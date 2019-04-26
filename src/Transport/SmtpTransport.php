@@ -2,9 +2,11 @@
 
 namespace Ddrv\Mailer\Transport;
 
+use Ddrv\Mailer\Exception\RecipientsListEmptyException;
 use Ddrv\Mailer\Message;
+use Ddrv\Mailer\TransportInterface;
 
-final class Smtp implements TransportInterface
+final class SmtpTransport implements TransportInterface
 {
 
     const ENCRYPTION_TLS = "tls";
@@ -19,7 +21,7 @@ final class Smtp implements TransportInterface
     /**
      * @var string
      */
-    private $sender;
+    private $email;
 
     /**
      * @var callable
@@ -32,13 +34,13 @@ final class Smtp implements TransportInterface
      * @param int $port
      * @param string $user
      * @param string $password
-     * @param string $sender
+     * @param string $email
      * @param string $encryption
      * @param string $domain
      */
-    public function __construct($host, $port, $user, $password, $sender, $encryption=self::ENCRYPTION_TLS, $domain="")
+    public function __construct($host, $port, $user, $password, $email, $encryption = self::ENCRYPTION_TLS, $domain = "")
     {
-        $this->sender = $sender;
+        $this->email = (string)$email;
         $host = (string)$host;
         $port = (int)$port;
         $user = (string)$user;
@@ -51,7 +53,6 @@ final class Smtp implements TransportInterface
             $this->socket = fsockopen((string)$host, (int)$port, $errCode, $errMessage, 30);
             $test = fgets($this->socket, 512);
             unset($test);
-
             $this->smtpCommand("EHLO $domain");
             $this->smtpCommand("AUTH LOGIN");
             $this->smtpCommand(base64_encode($user));
@@ -59,24 +60,33 @@ final class Smtp implements TransportInterface
         }
     }
 
-    public function send(Message $message, $recipients)
+    /**
+     * @param Message $message
+     * @return bool
+     * @throws RecipientsListEmptyException
+     */
+    public function send(Message $message)
     {
-        $this->smtpCommand("MAIL FROM: <{$this->sender}>");
-        $headers = $message->getHeadersLine();
-        foreach ($recipients as $address) {
+        if (!$message->getRecipients()) {
+            throw new RecipientsListEmptyException();
+        }
+        $this->smtpCommand("MAIL FROM: <{$this->email}>");
+        foreach ($message->getRecipients() as $address) {
             $this->smtpCommand("RCPT TO: <$address>");
         }
         $this->smtpCommand("DATA");
-        $this->smtpCommand("$headers\r\n\r\n{$message->getBody()}\r\n.");
+        $data = $message->getRaw();
+        $this->smtpCommand("$data\r\n.");
         return true;
     }
 
-    public function getSender()
+    /**
+     * @param callable $logger
+     */
+    public function setLogger(callable $logger)
     {
-        return $this->sender;
+        $this->logger = $logger;
     }
-
-
 
     /**
      * @param string $command
@@ -104,10 +114,5 @@ final class Smtp implements TransportInterface
     {
         $this->smtpCommand("QUIT");
         fclose($this->socket);
-    }
-
-    public function setLogger(callable $logger)
-    {
-        $this->logger = $logger;
     }
 }

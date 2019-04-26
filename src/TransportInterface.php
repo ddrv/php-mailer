@@ -1,8 +1,8 @@
 <?php
 
-namespace Ddrv\Mailer\Transport;
+namespace Ddrv\Mailer;
 
-use Ddrv\Mailer\Message;
+use Ddrv\Mailer\Exception\RecipientsListEmptyException;
 
 interface TransportInterface
 {
@@ -11,15 +11,10 @@ interface TransportInterface
      * Send mail
      *
      * @param Message $message
-     * @param string[] $recipients
      * @return bool
+     * @throws RecipientsListEmptyException
      */
-    public function send(Message $message, $recipients);
-
-    /**
-     * @return string
-     */
-    public function getSender();
+    public function send(Message $message);
 
     /**
      * @param callable $logger

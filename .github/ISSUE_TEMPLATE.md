@@ -8,9 +8,8 @@
 
 | Q                | A
 | ---------------- | ---
-| Mailer version   | 3.0.?
+| Mailer version   | 4.0.?
+| Mailer spool     | `memory` or `file`
 | Mailer transport | `sendmail`, `smtp`, etc
 | PHP version      | 5.?
 | Operating system |
-
-### Add your binary database file in attacnments

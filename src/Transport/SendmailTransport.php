@@ -2,31 +2,37 @@
 
 namespace Ddrv\Mailer\Transport;
 
+use Ddrv\Mailer\Exception\RecipientsListEmptyException;
 use Ddrv\Mailer\Message;
+use Ddrv\Mailer\TransportInterface;
 
-final class Sendmail implements TransportInterface
+final class SendmailTransport implements TransportInterface
 {
 
+    /**
+     * @var string
+     */
     private $options;
 
-    private $sender;
     /**
      * @var callable
      */
     private $logger;
 
-    public function __construct($sender, $options = "")
+    public function __construct($options = "")
     {
-        $this->sender = $sender;
         $this->options = (string)$options;
     }
 
-    public function send(Message $message, $recipients)
+    public function send(Message $message)
     {
+        if (!$message->getRecipients()) {
+            throw new RecipientsListEmptyException();
+        }
         $subject = $message->getSubject();
         $body = $message->getBody();
-        $headers = $message->getHeadersLine();
-        $to = implode(", ", $recipients);
+        $headers = implode("\r\n", $message->getHeaders());
+        $to = implode(", ", $message->getRecipients());
         if (is_callable($this->logger)) {
             $logger = $this->logger;
             $log = "mail(";
@@ -39,11 +45,6 @@ final class Sendmail implements TransportInterface
             $logger($log);
         }
         return mail($to, $subject, $body, $headers, $this->options);
-    }
-
-    public function getSender()
-    {
-        return $this->sender;
     }
 
     public function setLogger(callable $logger)
