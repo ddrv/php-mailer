@@ -1,6 +1,6 @@
 {
     "name": "ddrv/mailer",
-    "version": "4.0.1",
+    "version": "4.0.2",
     "type": "library",
     "description": "PHP library for sending email",
     "keywords": ["email", "mail", "send", "attachments", "smtp", "sendmail"],
