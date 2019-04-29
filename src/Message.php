@@ -148,10 +148,11 @@ final class Message
     public function setFrom($email, $name = "")
     {
         $email = (string)$email;
-        if (!$email) return false;
-        if (!$this->checkEmail($email)) return false;
+        if (!$email) return $this;
+        if (!$this->checkEmail($email)) return $this;
         $contact = $this->getContact($email, $name);
         $this->setHeaderRaw("From", $contact);
+        return $this;
     }
 
     public function getRecipients()
