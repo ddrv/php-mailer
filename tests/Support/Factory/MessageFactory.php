@@ -18,7 +18,7 @@ class MessageFactory
 
     public function __construct()
     {
-        $this->faker = Factory::create();
+        $this->faker = Factory::create("ru_RU");
         $this->from = sprintf("PHPUnit Test <%s+phpunit@localhost>", get_current_user());
     }
 

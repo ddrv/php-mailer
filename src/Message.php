@@ -50,13 +50,15 @@ final class Message
 
     public function __construct($subject = null, $html = null, $plain = null)
     {
+        $this->boundary = dechex(rand(0, 16777215));
         $this->setHeader("MIME-Version", "1.0");
+        $this->setHeaderRaw("Content-Type", "multipart/mixed; boundary=\"r={$this->boundary}\"");
+        $this->setHeader("Content-Transfer-Encoding", "7bit");
         $mailer = sprintf("ddrv/mailer-%s (https://github.com/ddrv/mailer)", Mailer::MAILER_VERSION);
         $this->setHeader("X-Mailer", $mailer);
         $this->setSubject($subject);
         $this->setHtmlBody($html);
         $this->setPlainBody($plain);
-        $this->boundary = dechex(rand(0, 16777215));
     }
 
     public function setSubject($subject)
@@ -143,6 +145,15 @@ final class Message
         return $this->bcc;
     }
 
+    public function setFrom($email, $name = "")
+    {
+        $email = (string)$email;
+        if (!$email) return false;
+        if (!$this->checkEmail($email)) return false;
+        $contact = $this->getContact($email, $name);
+        $this->setHeaderRaw("From", $contact);
+    }
+
     public function getRecipients()
     {
         return array_keys(array_replace($this->to, $this->cc, $this->bcc));
@@ -150,8 +161,14 @@ final class Message
 
     public function setHeader($header, $value)
     {
+        $this->setHeaderRaw($header, $this->headerEncode($value));
+        return $this;
+    }
+
+    private function setHeaderRaw($header, $value)
+    {
         $header = (string)$header;
-        $value = str_replace("\r\n", "", (string)$value);
+        //$value = str_replace(array("\r", "\n"), "", (string)$value);
         if ($value) {
             $this->headers[mb_strtolower($header)] = "$header: $value";
         } else {
@@ -226,8 +243,6 @@ final class Message
 
     public function getHeaders()
     {
-        $this->setHeader("Content-Type", "multipart/mixed; boundary=\"r={$this->boundary}\"");
-        $this->setHeader("Content-Transfer-Encoding", "7bit");
         $headers = array_values($this->headers);
         return $headers;
     }
@@ -359,17 +374,17 @@ final class Message
 
     private function replaceHeaderTo()
     {
-        $this->setHeader("To", implode(", ", $this->to));
+        $this->setHeaderRaw("To", implode(", ", $this->to));
     }
 
     private function replaceHeaderCc()
     {
-        $this->setHeader("Cc", implode(", ", $this->cc));
+        $this->setHeaderRaw("Cc", implode(", ", $this->cc));
     }
 
     private function replaceHeaderBcc()
     {
-        $this->setHeader("Bcc", implode(", ", $this->bcc));
+        $this->setHeaderRaw("Bcc", implode(", ", $this->bcc));
     }
 
     private function getContact($email, $name = "")
@@ -377,8 +392,8 @@ final class Message
         $email = (string)$email;
         $name = preg_replace("/[^\pL\s\,\.\d]/ui", "", (string)$name);
         $name = trim($name);
-        if (preg_match("/[\,\.]/ui", $name)) $name = "\"$name\"";
-        if ($name) $name .= " ";
+        if (preg_match("/[^a-z0-9\s]+/ui", $name)) $name = $this->headerEncode($name);
+        if ($name) $name = "$name ";
         return "$name<$email>";
     }
 
@@ -413,5 +428,11 @@ final class Message
         foreach ($keys as $key=>$default) {
             $this->$key = array_key_exists($key, $raw) ? $raw[$key] : $default;
         }
+    }
+
+    private function headerEncode($value)
+    {
+        $value = mb_encode_mimeheader($value, "UTF-8", "B", "\r\n", 0);
+        return $value;
     }
 }
