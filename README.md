@@ -202,3 +202,25 @@ $mailer->personal($message2); // without spool
 $mailer->personal($message2, 1); // with spool
 $mailer->flush();
 
+```
+
+If you using native library transport, you can use `Ddrv\Mailer\TransportFactory`.
+
+```php
+<?php
+
+use Ddrv\Mailer\TransportFactory;
+
+// smtp
+$transport = TransportFactory::make('smtp://user:password@example.com:465/?encryption=tls&domain=example.com&sender=user%40exapmle.com');
+
+// sendmail
+$transport = TransportFactory::make('sendmail://localhost/?options=-i+-r+user%40example.com');
+
+// file
+$transport = TransportFactory::make('file:////path/to/mail/files');
+
+// fake
+$transport = TransportFactory::make('fake://localhost');
+
+```
