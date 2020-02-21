@@ -97,7 +97,9 @@ final class Message
 
     public function removeTo($email)
     {
-        if (array_key_exists($email, $this->to)) unset($this->to[$email]);
+        if (array_key_exists($email, $this->to)) {
+            unset($this->to[$email]);
+        }
         $this->replaceHeaderTo();
         return $this;
     }
@@ -116,7 +118,9 @@ final class Message
 
     public function removeCc($email)
     {
-        if (array_key_exists($email, $this->cc)) unset($this->cc[$email]);
+        if (array_key_exists($email, $this->cc)) {
+            unset($this->cc[$email]);
+        }
         $this->replaceHeaderCc();
         return $this;
     }
@@ -135,7 +139,9 @@ final class Message
 
     public function removeBcc($email)
     {
-        if (array_key_exists($email, $this->bcc)) unset($this->bcc[$email]);
+        if (array_key_exists($email, $this->bcc)) {
+            unset($this->bcc[$email]);
+        }
         $this->replaceHeaderBcc();
         return $this;
     }
@@ -148,8 +154,12 @@ final class Message
     public function setFrom($email, $name = "")
     {
         $email = (string)$email;
-        if (!$email) return $this;
-        if (!$this->checkEmail($email)) return $this;
+        if (!$email) {
+            return $this;
+        }
+        if (!$this->checkEmail($email)) {
+            return $this;
+        }
         $contact = $this->getContact($email, $name);
         $this->setHeaderRaw("From", $contact);
         return $this;
@@ -269,7 +279,7 @@ final class Message
     {
         $text = "\r\nContent-type: text/plain; charset=UTF-8\r\n";
         $text .= "Content-Transfer-Encoding: base64\r\n\r\n";
-        $text .= chunk_split($content)."\r\n";
+        $text .= chunk_split($content) . "\r\n";
         return $text;
     }
 
@@ -282,7 +292,7 @@ final class Message
 
         $part = "\r\nContent-type: text/html; charset=UTF-8\r\n";
         $part .= "Content-Transfer-Encoding: base64\r\n\r\n";
-        $part .= chunk_split($content)."\r\n";
+        $part .= chunk_split($content) . "\r\n";
         $parts[] = $part;
         $parts[] = "--";
         $text .= implode("--$boundary", $parts);
@@ -299,7 +309,7 @@ final class Message
             $part = "\r\nContent-type: {$attachment["mime"]}; name=$name\r\n";
             $part .= "Content-Transfer-Encoding: base64\r\n";
             $part .= "Content-Disposition: attachment\r\n\r\n";
-            $part .= chunk_split($attachment["content"])."\r\n";
+            $part .= chunk_split($attachment["content"]) . "\r\n";
             $parts[] = $part;
         }
         $parts[] = "--";
@@ -317,7 +327,7 @@ final class Message
     {
         $result = array();
         $recipients = array_replace($this->to, $this->cc, $this->bcc);
-        foreach ($recipients as $email=>$recipient) {
+        foreach ($recipients as $email => $recipient) {
             $clone = clone $this;
             $clone->to = array(
                 $email => $recipient,
@@ -362,13 +372,23 @@ final class Message
     private function addAddress($type, $email, $name)
     {
         $email = (string)$email;
-        if (!$email) return false;
-        if (!$this->checkEmail($email)) return false;
+        if (!$email) {
+            return false;
+        }
+        if (!$this->checkEmail($email)) {
+            return false;
+        }
         $contact = $this->getContact($email, $name);
         switch ($type) {
-            case "to": $this->to[$email] = $contact; break;
-            case "cc": $this->cc[$email] = $contact; break;
-            case "bcc": $this->bcc[$email] = $contact; break;
+            case "to":
+                $this->to[$email] = $contact;
+                break;
+            case "cc":
+                $this->cc[$email] = $contact;
+                break;
+            case "bcc":
+                $this->bcc[$email] = $contact;
+                break;
         }
         return true;
     }
@@ -391,10 +411,14 @@ final class Message
     private function getContact($email, $name = "")
     {
         $email = (string)$email;
-        $name = preg_replace("/[^\pL\s\,\.\d]/ui", "", (string)$name);
+        $name = preg_replace("/[^\pL\s,.\d]/ui", "", (string)$name);
         $name = trim($name);
-        if (preg_match("/[^a-z0-9\s]+/ui", $name)) $name = $this->headerEncode($name);
-        if ($name) $name = "$name ";
+        if (preg_match("/[^a-z0-9\s]+/ui", $name)) {
+            $name = $this->headerEncode($name);
+        }
+        if ($name) {
+            $name = "$name ";
+        }
         return "$name<$email>";
     }
 
@@ -426,7 +450,7 @@ final class Message
             "bcc" => array(),
             "boundary" => md5(time()),
         );
-        foreach ($keys as $key=>$default) {
+        foreach ($keys as $key => $default) {
             $this->$key = array_key_exists($key, $raw) ? $raw[$key] : $default;
         }
     }

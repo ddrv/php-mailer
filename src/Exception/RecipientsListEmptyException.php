@@ -5,7 +5,7 @@ namespace Ddrv\Mailer\Exception;
 use Exception;
 use Throwable;
 
-class RecipientsListEmptyException extends Exception
+final class RecipientsListEmptyException extends Exception
 {
 
     public function __construct(Throwable $previous = null)

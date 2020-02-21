@@ -55,22 +55,21 @@ final class SmtpTransport implements TransportInterface
     private $connectDomain;
 
     /**
-     * Smtp constructor.
      * @param string $host
      * @param int $port
      * @param string $user
-     * @param string $password
+     * @param string $pass
      * @param string $email
      * @param string $encryption
      * @param string $domain
      */
-    public function __construct($host, $port, $user, $password, $email, $encryption = self::ENCRYPTION_TLS, $domain = "")
+    public function __construct($host, $port, $user, $pass, $email, $encryption = self::ENCRYPTION_TLS, $domain = "")
     {
         $this->email = (string)$email;
         $host = (string)$host;
         $port = (int)$port;
         $user = (string)$user;
-        $password = (string)$password;
+        $pass = (string)$pass;
         $domain = (string)$domain;
         if ($host && $port) {
             if (in_array($encryption, array(self::ENCRYPTION_TLS, self::ENCRYPTION_SSL))) {
@@ -79,7 +78,7 @@ final class SmtpTransport implements TransportInterface
             $this->connectHost = $host;
             $this->connectPort = $port;
             $this->connectUser = $user;
-            $this->connectPassword = $password;
+            $this->connectPassword = $pass;
             $this->connectDomain = $domain;
         }
     }
@@ -141,7 +140,7 @@ final class SmtpTransport implements TransportInterface
                 $logger = $this->logger;
                 $logger("> $command");
             }
-            fputs($this->socket, $command."\r\n");
+            fputs($this->socket, "$command\r\n");
             $response = fgets($this->socket, 512);
             if (is_callable($this->logger)) {
                 $logger = $this->logger;

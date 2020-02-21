@@ -63,10 +63,14 @@ final class Mailer
      */
     private function sendMail(Message $message, $personal = false, $priority = 1)
     {
-        if ($this->from) $message->setHeader("From", $this->from);
+        if ($this->from) {
+            $message->setHeader("From", $this->from);
+        }
         $priority = (int)$priority;
         $params = array();
-        if ($priority < 1) $priority = 0;
+        if ($priority < 1) {
+            $priority = 0;
+        }
         if ($priority) {
             $fn = array($this->spool, "add");
             $params[1] = $priority;
@@ -79,7 +83,8 @@ final class Mailer
             ksort($params);
             try {
                 call_user_func_array($fn, $params);
-            } catch (Throwable $e) {}
+            } catch (Throwable $e) {
+            }
         }
         return $this;
     }
