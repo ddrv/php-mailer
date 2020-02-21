@@ -30,6 +30,31 @@ final class SmtpTransport implements TransportInterface
     private $logger;
 
     /**
+     * @var string
+     */
+    private $connectHost;
+
+    /**
+     * @var int
+     */
+    private $connectPort;
+
+    /**
+     * @var string
+     */
+    private $connectUser;
+
+    /**
+     * @var string
+     */
+    private $connectPassword;
+
+    /**
+     * @var string
+     */
+    private $connectDomain;
+
+    /**
      * Smtp constructor.
      * @param string $host
      * @param int $port
@@ -51,14 +76,26 @@ final class SmtpTransport implements TransportInterface
             if (in_array($encryption, array(self::ENCRYPTION_TLS, self::ENCRYPTION_SSL))) {
                 $host = "$encryption://$host";
             }
-            $this->socket = fsockopen((string)$host, (int)$port, $errCode, $errMessage, 30);
-            $test = fgets($this->socket, 512);
-            unset($test);
-            $this->smtpCommand("EHLO $domain");
-            $this->smtpCommand("AUTH LOGIN");
-            $this->smtpCommand(base64_encode($user));
-            $this->smtpCommand(base64_encode($password));
+            $this->connectHost = $host;
+            $this->connectPort = $port;
+            $this->connectUser = $user;
+            $this->connectPassword = $password;
+            $this->connectDomain = $domain;
         }
+    }
+
+    private function connect()
+    {
+        if ($this->socket) {
+            return;
+        }
+        $this->socket = fsockopen($this->connectHost, $this->connectPort, $errCode, $errMessage, 30);
+        $test = fgets($this->socket, 512);
+        unset($test);
+        $this->smtpCommand("EHLO {$this->connectDomain}");
+        $this->smtpCommand("AUTH LOGIN");
+        $this->smtpCommand(base64_encode($this->connectUser));
+        $this->smtpCommand(base64_encode($this->connectPassword));
     }
 
     /**
@@ -68,6 +105,9 @@ final class SmtpTransport implements TransportInterface
      */
     public function send(Message $message)
     {
+        if (!$this->socket) {
+            $this->connect();
+        }
         if (!$message->getRecipients()) {
             throw new RecipientsListEmptyException();
         }
