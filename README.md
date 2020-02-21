@@ -11,7 +11,7 @@ PHP library for sending email.
 ## With [Composer](https://getcomposer.org/)
 1. Run in console:
     ```text
-    php composer.phar require ddrv/mailer:~4.0
+    php composer.phar require ddrv/mailer:~4.1
     ```
 1. Include autoload file
     ```php
