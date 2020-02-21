@@ -7,7 +7,7 @@ use Throwable;
 final class Mailer
 {
 
-    const MAILER_VERSION = "4.0.3";
+    const MAILER_VERSION = "4.1.0";
 
     /**
      * @var SpoolInterface
