@@ -21,7 +21,9 @@ final class FileTransport implements TransportInterface
 
     public function __construct($dir)
     {
-        if (!is_dir($dir)) mkdir($dir, 0775, true);
+        if (!is_dir($dir)) {
+            mkdir($dir, 0775, true);
+        }
         $this->dir = $dir;
     }
 
@@ -40,7 +42,9 @@ final class FileTransport implements TransportInterface
             $user = $arr[0];
             $host = $arr[1];
             $dir = implode(DIRECTORY_SEPARATOR, array($this->dir, $host, $user));
-            if (!is_dir($dir)) mkdir($dir, 0644, true);
+            if (!is_dir($dir)) {
+                mkdir($dir, 0644, true);
+            }
             $num = 1;
             do {
                 $prefix = "mail_" . date("YmdHis");

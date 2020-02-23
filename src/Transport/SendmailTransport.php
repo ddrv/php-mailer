@@ -37,11 +37,11 @@ final class SendmailTransport implements TransportInterface
         if (is_callable($this->logger)) {
             $logger = $this->logger;
             $log = "mail(";
-            $log .= "\"".addslashes($to)."\", ";
-            $log .= "\"".addslashes($subject)."\", ";
-            $log .= "\"".addslashes($body)."\", ";
-            $log .= "\"".addslashes($headers)."\", ";
-            $log .= "\"".addslashes($this->options)."\", ";
+            $log .= "\"" . addslashes($to) . "\", ";
+            $log .= "\"" . addslashes($subject) . "\", ";
+            $log .= "\"" . addslashes($body) . "\", ";
+            $log .= "\"" . addslashes($headers) . "\", ";
+            $log .= "\"" . addslashes($this->options) . "\", ";
             $log .= ");";
             $logger($log);
         }

@@ -57,15 +57,20 @@ final class MemorySpool implements SpoolInterface
     public function flush($limit = 0)
     {
         $limit = (int)$limit;
-        if ($limit < 1) $limit = 0;
+        if ($limit < 1) {
+            $limit = 0;
+        }
         $send = 0;
         ksort($this->messages);
         foreach ($this->messages as $priority => $messages) {
             foreach ($messages as $key => $message) {
-                if ($limit && $send >= $limit) return;
+                if ($limit && $send >= $limit) {
+                    return;
+                }
                 try {
                     $this->transport->send($message);
-                } catch (RecipientsListEmptyException $e) {}
+                } catch (RecipientsListEmptyException $e) {
+                }
                 unset($this->messages[$priority][$key]);
                 $send++;
             }

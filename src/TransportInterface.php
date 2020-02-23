@@ -23,4 +23,3 @@ interface TransportInterface
      */
     public function setLogger(Closure $logger);
 }
-

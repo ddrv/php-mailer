@@ -30,35 +30,71 @@ final class SmtpTransport implements TransportInterface
     private $logger;
 
     /**
-     * Smtp constructor.
+     * @var string
+     */
+    private $connectHost;
+
+    /**
+     * @var int
+     */
+    private $connectPort;
+
+    /**
+     * @var string
+     */
+    private $connectUser;
+
+    /**
+     * @var string
+     */
+    private $connectPassword;
+
+    /**
+     * @var string
+     */
+    private $connectDomain;
+
+    /**
      * @param string $host
      * @param int $port
      * @param string $user
-     * @param string $password
+     * @param string $pass
      * @param string $email
      * @param string $encryption
      * @param string $domain
      */
-    public function __construct($host, $port, $user, $password, $email, $encryption = self::ENCRYPTION_TLS, $domain = "")
+    public function __construct($host, $port, $user, $pass, $email, $encryption = self::ENCRYPTION_TLS, $domain = "")
     {
         $this->email = (string)$email;
         $host = (string)$host;
         $port = (int)$port;
         $user = (string)$user;
-        $password = (string)$password;
+        $pass = (string)$pass;
         $domain = (string)$domain;
         if ($host && $port) {
             if (in_array($encryption, array(self::ENCRYPTION_TLS, self::ENCRYPTION_SSL))) {
                 $host = "$encryption://$host";
             }
-            $this->socket = fsockopen((string)$host, (int)$port, $errCode, $errMessage, 30);
-            $test = fgets($this->socket, 512);
-            unset($test);
-            $this->smtpCommand("EHLO $domain");
-            $this->smtpCommand("AUTH LOGIN");
-            $this->smtpCommand(base64_encode($user));
-            $this->smtpCommand(base64_encode($password));
+            $this->connectHost = $host;
+            $this->connectPort = $port;
+            $this->connectUser = $user;
+            $this->connectPassword = $pass;
+            $this->connectDomain = $domain;
         }
+    }
+
+    private function connect()
+    {
+        if ($this->socket) {
+            return;
+        }
+        $this->socket = fsockopen($this->connectHost, $this->connectPort, $errCode, $errMessage, 30);
+        $test = fgets($this->socket, 512);
+        unset($test);
+        $this->smtpCommand("EHLO {$this->connectDomain}");
+        $this->smtpCommand("AUTH LOGIN");
+        $this->smtpCommand(base64_encode($this->connectUser));
+        $this->smtpCommand(base64_encode($this->connectPassword));
     }
 
     /**
@@ -68,6 +104,9 @@ final class SmtpTransport implements TransportInterface
      */
     public function send(Message $message)
     {
+        if (!$this->socket) {
+            $this->connect();
+        }
         if (!$message->getRecipients()) {
             throw new RecipientsListEmptyException();
         }
@@ -101,7 +140,7 @@ final class SmtpTransport implements TransportInterface
                 $logger = $this->logger;
                 $logger("> $command");
             }
-            fputs($this->socket, $command."\r\n");
+            fputs($this->socket, "$command\r\n");
             $response = fgets($this->socket, 512);
             if (is_callable($this->logger)) {
                 $logger = $this->logger;

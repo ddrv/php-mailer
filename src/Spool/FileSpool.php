@@ -70,14 +70,19 @@ final class FileSpool implements SpoolInterface
     public function flush($limit = 0)
     {
         $limit = (int)$limit;
-        if ($limit < 1) $limit = 0;
+        if ($limit < 1) {
+            $limit = 0;
+        }
         $send = 0;
         foreach (glob(implode(DIRECTORY_SEPARATOR, array($this->dir, "mail_???_??????????????_???.eml"))) as $file) {
-            if ($limit && $send >= $limit) return;
+            if ($limit && $send >= $limit) {
+                return;
+            }
             $message = unserialize(base64_decode(file_get_contents($file)));
             try {
                 $this->transport->send($message);
-            } catch (RecipientsListEmptyException $e) {}
+            } catch (RecipientsListEmptyException $e) {
+            }
             unlink($file);
             $send++;
         }
