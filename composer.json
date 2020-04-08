@@ -1,6 +1,5 @@
 {
     "name": "ddrv/mailer",
-    "version": "4.1.0",
     "type": "library",
     "description": "PHP library for sending email",
     "keywords": ["email", "mail", "send", "attachments", "smtp", "sendmail"],
@@ -33,5 +32,11 @@
         "psr-4": {
             "Tests\\Ddrv\\Mailer\\": "tests/"
         }
-    }
+    },
+    "funding": [
+        {
+            "type": "other",
+            "url": "https://www.paypal.me/ddrv"
+        }
+    ]
 }
