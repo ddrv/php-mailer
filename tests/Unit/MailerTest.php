@@ -89,17 +89,17 @@ class MailerTest extends TestCase
     private function generateMessages($quantity)
     {
         $messages = array();
-        for ($i=1; $i<=$quantity; $i++) {
-            $messages[] = $this->factory->generateMessage(rand(1,20), rand(1,20), rand(1,20));
+        for ($i = 1; $i <= $quantity; $i++) {
+            $messages[] = $this->factory->generateMessage(rand(1, 20), rand(1, 20), rand(1, 20));
         }
         return $messages;
     }
 
     public static function assertMessage(Message $expected, Message $actual)
     {
-        self::assertSame($expected->getSubject(),    $actual->getSubject());
-        self::assertSame($expected->getBody(),       $actual->getBody());
-        self::assertSame($expected->getHeaders(),    $actual->getHeaders());
+        self::assertSame($expected->getSubject(), $actual->getSubject());
+        self::assertSame($expected->getBody(), $actual->getBody());
+        self::assertSame($expected->getHeaders(), $actual->getHeaders());
         self::assertSame($expected->getRecipients(), $actual->getRecipients());
     }
 }

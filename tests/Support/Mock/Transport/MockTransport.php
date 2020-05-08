@@ -10,7 +10,7 @@ use Ddrv\Mailer\TransportInterface;
 final class MockTransport implements TransportInterface
 {
     /**
-     * @var callable
+     * @var Closure
      */
     private $logger;
 
