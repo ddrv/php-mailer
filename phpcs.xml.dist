@@ -8,7 +8,9 @@
     <arg name="colors"/>
 
     <!-- inherit rules from: -->
-    <rule ref="PSR12"/>
+    <rule ref="PSR12">
+        <exclude name="PSR12.Properties.ConstantVisibility.NotFound"/>
+    </rule>
 
     <!-- Paths to check -->
     <file>src</file>
