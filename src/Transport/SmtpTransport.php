@@ -152,7 +152,9 @@ final class SmtpTransport implements TransportInterface
 
     public function __destruct()
     {
-        $this->smtpCommand("QUIT");
-        fclose($this->socket);
+        if (is_resource($this->socket)) {
+            $this->smtpCommand("QUIT");
+            fclose($this->socket);
+        }
     }
 }
