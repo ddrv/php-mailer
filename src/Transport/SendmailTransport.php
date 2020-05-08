@@ -16,7 +16,7 @@ final class SendmailTransport implements TransportInterface
     private $options;
 
     /**
-     * @var callable
+     * @var Closure
      */
     private $logger;
 

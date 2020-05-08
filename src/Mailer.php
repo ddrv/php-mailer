@@ -2,7 +2,7 @@
 
 namespace Ddrv\Mailer;
 
-use Throwable;
+use Exception;
 
 final class Mailer
 {
@@ -83,7 +83,7 @@ final class Mailer
             ksort($params);
             try {
                 call_user_func_array($fn, $params);
-            } catch (Throwable $e) {
+            } catch (Exception $e) {
             }
         }
         return $this;

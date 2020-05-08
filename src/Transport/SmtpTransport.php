@@ -25,7 +25,7 @@ final class SmtpTransport implements TransportInterface
     private $email;
 
     /**
-     * @var callable
+     * @var Closure
      */
     private $logger;
 
