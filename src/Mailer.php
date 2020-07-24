@@ -2,12 +2,12 @@
 
 namespace Ddrv\Mailer;
 
-use Throwable;
+use Exception;
 
 final class Mailer
 {
 
-    const MAILER_VERSION = "4.1.0";
+    const MAILER_VERSION = "4.1.4";
 
     /**
      * @var SpoolInterface
@@ -83,7 +83,7 @@ final class Mailer
             ksort($params);
             try {
                 call_user_func_array($fn, $params);
-            } catch (Throwable $e) {
+            } catch (Exception $e) {
             }
         }
         return $this;
