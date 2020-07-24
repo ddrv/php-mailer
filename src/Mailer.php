@@ -7,7 +7,7 @@ use Exception;
 final class Mailer
 {
 
-    const MAILER_VERSION = "4.1.3";
+    const MAILER_VERSION = "4.1.4";
 
     /**
      * @var SpoolInterface
