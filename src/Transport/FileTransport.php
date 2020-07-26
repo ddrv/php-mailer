@@ -2,17 +2,12 @@
 
 namespace Ddrv\Mailer\Transport;
 
-use Closure;
+use Ddrv\Mailer\Contract\Message;
+use Ddrv\Mailer\Contract\Transport;
 use Ddrv\Mailer\Exception\RecipientsListEmptyException;
-use Ddrv\Mailer\Message;
-use Ddrv\Mailer\TransportInterface;
 
-final class FileTransport implements TransportInterface
+final class FileTransport implements Transport
 {
-    /**
-     * @var Closure
-     */
-    private $logger;
 
     /**
      * @var string
@@ -32,13 +27,9 @@ final class FileTransport implements TransportInterface
         if (!$message->getRecipients()) {
             throw new RecipientsListEmptyException();
         }
-        $content = $message->getRaw();
-        if (is_callable($this->logger)) {
-            $logger = $this->logger;
-            $logger($content);
-        }
+        $content = $message->getHeadersRaw() . "\r\n\r\n" . $message->getBodyRaw();
         foreach ($message->getRecipients() as $email) {
-            $arr = explode("@", $email);
+            $arr = explode('@', $email);
             $user = $arr[0];
             $host = $arr[1];
             $dir = implode(DIRECTORY_SEPARATOR, array($this->dir, $host, $user));
@@ -47,18 +38,13 @@ final class FileTransport implements TransportInterface
             }
             $num = 1;
             do {
-                $prefix = "mail_" . date("YmdHis");
-                $suffix = str_pad($num, 5, "0", STR_PAD_LEFT);
-                $file = implode(DIRECTORY_SEPARATOR, array($dir, "{$prefix}_{$suffix}.eml"));
+                $prefix = 'mail_' . date('YmdHis');
+                $suffix = str_pad($num, 5, '0', STR_PAD_LEFT);
+                $file = implode(DIRECTORY_SEPARATOR, array($dir, $prefix . '_' . $suffix . '.eml'));
                 $num++;
-            } while (is_file($file));
+            } while (file_exists($file));
             file_put_contents($file, $content);
         }
         return true;
-    }
-
-    public function setLogger(Closure $logger)
-    {
-        $this->logger = $logger;
     }
 }

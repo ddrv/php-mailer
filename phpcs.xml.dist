@@ -14,5 +14,6 @@
 
     <!-- Paths to check -->
     <file>src</file>
+    <file>stuff</file>
     <file>tests</file>
 </ruleset>

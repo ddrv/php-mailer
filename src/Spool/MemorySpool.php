@@ -2,78 +2,33 @@
 
 namespace Ddrv\Mailer\Spool;
 
-use Ddrv\Mailer\Exception\RecipientsListEmptyException;
-use Ddrv\Mailer\Message;
-use Ddrv\Mailer\SpoolInterface;
-use Ddrv\Mailer\TransportInterface;
+use Ddrv\Mailer\Contract\Message;
+use Ddrv\Mailer\Contract\Spool;
 
-final class MemorySpool implements SpoolInterface
+final class MemorySpool implements Spool
 {
 
     /**
      * @var Message[][]
      */
-    private $messages = array();
+    private $spool = array();
 
     /**
-     * @var TransportInterface;
+     * @inheritDoc
      */
-    private $transport;
-
-    public function __construct(TransportInterface $transport)
+    public function push(Message $message, $attempt)
     {
-        $this->transport = $transport;
+        $this->spool[$attempt][] = $message;
     }
 
     /**
-     * @param Message $message
-     * @param int $priority
-     * @return self
-     * @throws RecipientsListEmptyException
+     * @inheritDoc
      */
-    public function add(Message $message, $priority = 0)
+    public function pull($attempt)
     {
-        if (!$message->getRecipients()) {
-            throw new RecipientsListEmptyException();
+        if (!array_key_exists($attempt, $this->spool) || empty($this->spool[$attempt])) {
+            return null;
         }
-        $this->messages[$priority][] = $message;
-        return $this;
-    }
-
-    /**
-     * @param Message $message
-     * @return self
-     * @throws RecipientsListEmptyException
-     */
-    public function send(Message $message)
-    {
-        $this->transport->send($message);
-        return $this;
-    }
-
-    /**
-     * @param int $limit
-     */
-    public function flush($limit = 0)
-    {
-        $limit = (int)$limit;
-        if ($limit < 1) {
-            $limit = 0;
-        }
-        $send = 0;
-        ksort($this->messages);
-        foreach ($this->messages as $priority => $messages) {
-            foreach ($messages as $key => $message) {
-                if ($limit && $send >= $limit) {
-                    return;
-                }
-                try {
-                    $this->transport->send($message);
-                } catch (RecipientsListEmptyException $e) {
-                }
-                unset($this->messages[$priority][$key]);
-                $send++;
-            }
-        }
+        return array_shift($this->spool[$attempt]);
     }
 }

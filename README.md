@@ -3,136 +3,142 @@
 [![License](https://img.shields.io/packagist/l/ddrv/mailer.svg?style=flat-square)](https://github.com/ddrv/php-mailer/blob/master/LICENSE)
 [![PHP](https://img.shields.io/packagist/php-v/ddrv/mailer.svg?style=flat-square)](https://php.net)
 
-
 # Mailer
+
 PHP library for sending email.
 
 # Install
-## With [Composer](https://getcomposer.org/)
+
 1. Run in console:
-    ```text
-    php composer.phar require ddrv/mailer:~4.1
+    ```bash
+    composer require ddrv/mailer:^5
     ```
+
 1. Include autoload file
     ```php
     require_once('vendor/autoload.php');
     ```
 
-
 # Usage
+
+## Creating transport instance
+
+### Sendmail
 
 ```php
 <?php
 
-use \Ddrv\Mailer\Transport\SendmailTransport;
-use \Ddrv\Mailer\Transport\SmtpTransport;
-use \Ddrv\Mailer\Transport\FakeTransport;
-use \Ddrv\Mailer\Spool\MemorySpool;
-use \Ddrv\Mailer\Spool\FileSpool;
-use \Ddrv\Mailer\Mailer;
-use \Ddrv\Mailer\Message;
-
-/*
- * Step 1. Initialization transport
- * --------------------------------
- */
-
-/*
- * a. Sendmail
- */
-$transport = new SendmailTransport(
-    '-f'                // sendmail options
+$transport = new Ddrv\Mailer\Transport\SendmailTransport(
+    '-f' // sendmail options
 );
+```
 
-/*
- * b. SMTP
- */
-$transport = new SmtpTransport(
-    'smtp.fight.club',  // host
-    25,                 // port
-    'joe',              // login
-    'IAmJoesLiver',     // password
-    'joe@fight.club',   // sender
+### SMTP
+
+```php
+<?php
+
+$transport = new Ddrv\Mailer\Transport\SmtpTransport(
+    'smtp.fight.club',  // host (REQUIRED)
+    25,                 // port (REQUIRED)
+    'joe',              // login (REQUIRED)
+    'IAmJoesLiver',     // password (REQUIRED)
+    'joe@fight.club',   // sender email (REQUIRED)
+    'Fight Club',       // sender name
     null,               // encryption: 'tls', 'ssl' or null
     'http://fight.club' // domain
 );
+```
 
-/*
- * c. Fake (emulation send emails)
- */
+### Fake (emulation send emails)
 
-$transport = new FakeTransport();
+```php
+<?php
 
-/*
- * d. Other. You can implement Ddrv\Mailer\Transport\TransportInterface interface 
- */
+$transport = new Ddrv\Mailer\Transport\FakeTransport();
+```
 
-/*
- * Step 2. Initialization spool
- * -----------------------------
- */
+### Custom
 
-/*
- * a. File spool. 
- */
-$spool = new FileSpool($transport, sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'mail');
+You can implement Ddrv\Mailer\Contract\Transport interface
 
-/*
- * b. Memory spool. 
- */
-$spool = new MemorySpool($transport);
+```php
+<?php
 
-/*
- * c. Other. You can implement Ddrv\Mailer\SpoolInterface interface 
- */
+/** @var Ddrv\Mailer\Contract\Transport $transport */
+```
 
-/*
- * Step 3. Initialization Mailer
- * -----------------------------
- */
-$mailer = new Mailer($spool);
+## Creating mailer instance
 
-// If you need a replace header "From" in all messages, set your sender in second parameter 
-$mailer = new Mailer($spool, "Fight Club Informer <info@fight.club>");
+```php
+<?php
 
-/*
- * Step 4. Create message
- * ----------------------
- */
- 
+/** @var Ddrv\Mailer\Contract\Transport $transport */
+$mailer = new Ddrv\Mailer\Mailer($transport);
+```
 
-$message1 = new Message(
-    'Test message',           // subject of message
-    '<h1>Hello, world!</h1>', // html body
-    'Hello, world!'           // plain body
+## Creating message instance
+
+```php
+<?php
+
+$message = new Ddrv\Mailer\Message(
+    'Subject',     // Subject
+    '<p>HTML</p>', // HTML body
+    'Simple text.' // Text plain body
 );
-$message1->addTo('recipient@example.com', 'My Friend');
+```
 
-$html = <<<HTML
-<h1>Welcome to Fight Club</h1>
-<p>Please, read our rules in attachments</p>
-HTML;
+## Sending message
 
-$text = <<<TEXT
-Welcome to Fight Club
-Please, read our rules in attachments
-TEXT;
+```php
+<?php
 
-$message2 = new Message();
-$message2
-    ->setSubject('Fight Club')
-    ->setHtmlBody($html)
-    ->setPlainBody($text)
-;
-
-/*
- * Step 5. Attachments
- * -------------------
+/**
+ * @var Ddrv\Mailer\Contract\Message $message
+ * @var Ddrv\Mailer\Mailer $mailer
  */
+$mailer->send($message);
+```
 
-/*
- * a. Creating attachment from string
- */
+## Message methods
+
+```php
+<?php
+
+/** @var Ddrv\Mailer\Message $message */
+$message->setSubject('Welcome to Fight Club!');
+$message->setText('Welcome to Fight Club!' . PHP_EOL . 'Please, read our rules in attachments.');
+$html = '<h1>Welcome to Fight Club!</h1><p>Please, read our rules in attachments.</p>';
+$html .= '<img src="cid:poster" alt="Poster"/><img src="cid:ticket" alt="Your ticket"/>';
+$message->setHtml($html);
+
+$message->setSender('support@fight.club', 'Support od Fight Club'); // The SMTP transport will set its value.
+$message->removeSender(); // If you decide to cancel. The SMTP transport will set its value.
+
+$message->addRecipient('tyler@fight.club', 'Tyler Durden', Ddrv\Mailer\Contract\Message::RECIPIENT_TO);
+$message->addRecipient('bob@fight.club', 'Robert Paulson', Ddrv\Mailer\Contract\Message::RECIPIENT_CC);
+$message->addRecipient('angel@fight.club', 'Angel Face', Ddrv\Mailer\Contract\Message::RECIPIENT_BCC);
+$message->addRecipient('r.chesler@car-vendor.com', 'Richard Chesler', Ddrv\Mailer\Contract\Message::RECIPIENT_TO);
+
+$message->getRecipientName('bob@fight.club'); // Returns 'Robert Paulson'.
+$message->getRecipientName('unknown@fight.club'); // Returns null.
+
+$message->removeRecipient('r.chesler@car-vendor.com'); // If you change your mind.
+
+// You may remove recipients by type
+$message->removeRecipients(Ddrv\Mailer\Contract\Message::RECIPIENT_TO);
+$message->removeRecipients(Ddrv\Mailer\Contract\Message::RECIPIENT_CC);
+$message->removeRecipients(Ddrv\Mailer\Contract\Message::RECIPIENT_BCC);
+// Or all
+$message->removeRecipients();
+
+$message->addRecipient('tyler@fight.club', 'Tyler Durden', Ddrv\Mailer\Contract\Message::RECIPIENT_TO);
+$message->addRecipient('bob@fight.club', 'Robert Paulson', Ddrv\Mailer\Contract\Message::RECIPIENT_CC);
+$message->addRecipient('angel@fight.club', 'Angel Face', Ddrv\Mailer\Contract\Message::RECIPIENT_BCC);
+
+
+
 $rules = <<<TEXT
 1. You don't talk about fight club.
 2. You don't talk about fight club.
@@ -143,68 +149,113 @@ $rules = <<<TEXT
 7. The fights go on as long as they have to.
 8. If this is your first night at fight club, you have to fight.
 TEXT;
-
-$message2->attachFromString(
-    'fight-club.txt', // attachment name
-    $rules,           // content
-    'text/plain'      // content-type
+$message->attachFromString(
+    'rules.txt',                // Attachment name (REQUIRED)
+    $rules,                     // Contents (REQUIRED)
+    'text/plain; charset=UTF-8' // Mime Type
 );
 
-/*
- * b. Creating attachments from file
- */
+
 $path = '/home/tyler/docs/projects/mayhem/rules.txt';
 
-$message2->attachFromFile(
-    'project-mayhem.txt',  // attachment name
-     $path                 // path to attached file
+$message->attachFromFile(
+    'project-mayhem.txt',       // Attachment name (REQUIRED)
+     $path,                     // Path to attached file (REQUIRED)
+    'text/plain; charset=UTF-8' // Mime Type
 );
 
-/*
- * Step 6. Add recipients
- */
-$message2->addTo('tyler@fight.club', 'Tyler Durden');
-$message2->addCc('bob@fight.club', 'Robert Paulson');
-$message2->addBcc('angel@fight.club', 'Angel Face');
+$message->detach('project-mayhem.txt'); // If you change your mind.
 
-/*
- * Step 7. Send mail
- * -----------------
- */
+$message->setHtmlContentFromString(
+    'ticket',                                            // HTML Content ID
+    file_get_contents('/home/tyler/tickets/038994.jpg'), // Contents (REQUIRED)
+    'image/jpeg'                                         // Mime Type
+);
 
-/*
- * a. Simple send to all recipients
- */
-$mailer->send($message1);
+$message->setHtmlContentFromString(
+    'script',                // HTML Content ID
+    'alert("ok");',          // Contents (REQUIRED)
+    'application/javascript' // Mime Type
+);
 
-/*
- * b. Spooling
- * For add message to spool, you need set second parameter as positive integer
- */
-$mailer->send($message1, 2);
-$mailer->send($message2, 1);
+$message->setHtmlContentFromFile(
+    'poster',                            // HTML Content ID
+    '/home/tyler/images/fight-club.jpg', // Path to file (REQUIRED)
+    'image/jpeg'                         // Mime Type
+);
 
-// Send from spool.
-$mailer->flush();
+$message->unsetBodyHtmlContent('script'); // If you change your mind.
 
-/*
- * You can set limit for send messages from spool
- */
-$mailer->flush(5);
+$message->hasHeader('X-Some-Header');          // Returns false.
+$message->setHeader('X-Some-Header', 'Value'); // Header set.
+$message->hasHeader('X-Some-Header');          // Returns true.
+$message->getHeader('X-Some-Header');          // Returns 'Value'.
+$message->removeHeader('X-Some-Header');       // Header removed.
+$message->hasHeader('X-Some-Header');          // Returns false.
 
-/*
- * Step 8. Personal mailing
- * You can send one message with many recipient as many mails per recipient 
- * (messages will be without CC fnd BCC headers and include only one email on To header).
- */
-$mailer->personal($message2); // without spool
-// or
-$mailer->personal($message2, 1); // with spool
-$mailer->flush();
+$message->getRecipients(); // Returns array if recipients emails.
+$message->getSubject(); // Returns mail subject.
+$message->getHeadersRaw(); // Returns string of mail headers.
+$message->getBodyRaw(); // Returns string of mail body.
 
 ```
 
-If you using native library transport, you can use `Ddrv\Mailer\TransportFactory`.
+You can implement Ddrv\Mailer\Contract\Message interface for work with custom messages. 
+
+## Spool
+
+This package allows you to use mail spool.
+
+This requires:
+* create a spool object (instance of `Ddrv\Mailer\Contract\Spool`)
+* create a transport object (instance of `Ddrv\Mailer\Contract\Transport`)
+* wrap them up in special transport `Ddrv\Mailer\Transport\SpoolTransport`
+
+```php
+<?php
+
+/**
+ * @var Ddrv\Mailer\Contract\Transport $transport
+ * @var Ddrv\Mailer\Contract\Message $message1
+ * @var Ddrv\Mailer\Contract\Message $message2
+ */
+$spool = new Ddrv\Mailer\Spool\MemorySpool();
+// or
+$spool = new Ddrv\Mailer\Spool\FileSpool('/path/to/emails');
+// Or any implementation of Ddrv\Mailer\Contract\Spool
+
+$wrapper = new Ddrv\Mailer\Transport\SpoolTransport($transport, $spool);
+$mailer = new Ddrv\Mailer\Mailer($wrapper);
+
+$mailer->send($message1);
+$mailer->send($message2);
+
+// Now the letters will only be added to the queue.
+// To send them, you need to execute:
+
+$wrapper->flush(
+    100, // Number of emails sent.
+    5    // Number of attempts to send emails.
+);
+```
+
+## Personal mailing
+
+If you have a copy of a message with many recipients, but you want to send separate emails to each recipient (no copies)
+
+```php
+<?php
+
+/**
+ * @var Ddrv\Mailer\Mailer $mailer
+ * @var Ddrv\Mailer\Contract\Message $message
+ */
+$mailer->personal($message);
+```
+
+## Transport factory
+
+If you use native library transport, you can use `Ddrv\Mailer\TransportFactory`.
 
 ```php
 <?php
@@ -212,7 +263,7 @@ If you using native library transport, you can use `Ddrv\Mailer\TransportFactory
 use Ddrv\Mailer\TransportFactory;
 
 // smtp
-$transport = TransportFactory::make('smtp://user:password@example.com:465/?encryption=tls&domain=example.com&sender=user%40exapmle.com');
+$transport = TransportFactory::make('smtp://user:password@example.com:465/?encryption=tls&domain=example.com&sender=user%40exapmle.com&name=Informer');
 
 // sendmail
 $transport = TransportFactory::make('sendmail://localhost/?options=-i+-r+user%40example.com');

@@ -1,13 +1,13 @@
 <?php
 
-namespace Tests\Ddrv\Mailer\Support\Mock\Transport;
+namespace Stuff\Ddrv\Mailer\Transport;
 
 use Closure;
+use Ddrv\Mailer\Contract\Message;
+use Ddrv\Mailer\Contract\Transport;
 use Ddrv\Mailer\Exception\RecipientsListEmptyException;
-use Ddrv\Mailer\Message;
-use Ddrv\Mailer\TransportInterface;
 
-final class MockTransport implements TransportInterface
+final class MockTransport implements Transport
 {
     /**
      * @var Closure
@@ -19,6 +19,11 @@ final class MockTransport implements TransportInterface
      */
     private $messages = array();
 
+    public function __construct(Closure $logger = null)
+    {
+        $this->logger = $logger;
+    }
+
     public function send(Message $message)
     {
         if (!$message->getRecipients()) {
@@ -26,16 +31,11 @@ final class MockTransport implements TransportInterface
         }
         if (is_callable($this->logger)) {
             $logger = $this->logger;
-            $content = $message->getRaw();
+            $content = $message->getHeadersRaw() . "\r\n\r\n" . $message->getBodyRaw();
             $logger($content);
         }
         $this->messages[] = $message;
         return true;
-    }
-
-    public function setLogger(Closure $logger)
-    {
-        $this->logger = $logger;
     }
 
     public function pull()

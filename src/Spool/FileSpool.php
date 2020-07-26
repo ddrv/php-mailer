@@ -2,89 +2,60 @@
 
 namespace Ddrv\Mailer\Spool;
 
-use Ddrv\Mailer\Exception\RecipientsListEmptyException;
-use Ddrv\Mailer\Message;
-use Ddrv\Mailer\SpoolInterface;
-use Ddrv\Mailer\TransportInterface;
+use Ddrv\Mailer\Contract\Message;
+use Ddrv\Mailer\Contract\Spool;
 
-final class FileSpool implements SpoolInterface
+final class FileSpool implements Spool
 {
-
-    /**
-     * @var TransportInterface;
-     */
-    private $transport;
 
     /**
      * @var string
      */
     private $dir;
 
-    public function __construct(TransportInterface $transport, $dir)
+    public function __construct($dir)
     {
         if (!is_dir($dir)) {
             mkdir($dir, 0644, true);
         }
         $this->dir = $dir;
-        $this->transport = $transport;
     }
 
     /**
-     * @param Message $message
-     * @return self
-     * @throws RecipientsListEmptyException
+     * @inheritDoc
      */
-    public function send(Message $message)
+    public function push(Message $message, $attempt)
     {
-        $this->transport->send($message);
-        return $this;
-    }
-
-    /**
-     * @param Message $message
-     * @param int $priority
-     * @return self
-     * @throws RecipientsListEmptyException
-     */
-    public function add(Message $message, $priority = 0)
-    {
-        if (!$message->getRecipients()) {
-            throw new RecipientsListEmptyException();
-        }
-        $priority = str_pad((int)$priority, 3, "0", STR_PAD_LEFT);
+        $priority = str_pad((int)$attempt, 3, '0', STR_PAD_LEFT);
         $num = 1;
         $content = base64_encode(serialize($message));
+        $prefix = 'mail_' . $priority . '_' . date('YmdHis');
         do {
-            $prefix = "mail_" . $priority . "_" . date("YmdHis");
             $suffix = str_pad($num, 3, "0", STR_PAD_LEFT);
-            $file = implode(DIRECTORY_SEPARATOR, array($this->dir, "{$prefix}_{$suffix}.eml"));
+            $file = implode(DIRECTORY_SEPARATOR, array($this->dir, $prefix . '_' . $suffix . '.eml'));
             $num++;
-        } while (is_file($file));
+        } while (file_exists($file));
         file_put_contents($file, $content);
-        return $this;
     }
 
     /**
-     * @param int $limit
+     * @inheritDoc
      */
-    public function flush($limit = 0)
+    public function pull($attempt)
     {
-        $limit = (int)$limit;
-        if ($limit < 1) {
-            $limit = 0;
+        $priority = str_pad((int)$attempt, 3, '0', STR_PAD_LEFT);
+        $files = glob(implode(DIRECTORY_SEPARATOR, array($this->dir, 'mail_' . $priority . '_??????????????_???.eml')));
+        if (!$files) {
+            return null;
         }
-        $send = 0;
-        foreach (glob(implode(DIRECTORY_SEPARATOR, array($this->dir, "mail_???_??????????????_???.eml"))) as $file) {
-            if ($limit && $send >= $limit) {
-                return;
-            }
+        do {
+            $file = array_shift($files);
             $message = unserialize(base64_decode(file_get_contents($file)));
-            try {
-                $this->transport->send($message);
-            } catch (RecipientsListEmptyException $e) {
-            }
             unlink($file);
-            $send++;
-        }
+            if (!$message instanceof Message) {
+                $message = null;
+            }
+        } while (!$message && $files);
+        return $message;
     }
 }

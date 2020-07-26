@@ -1,25 +1,18 @@
 <?php
 
-namespace Ddrv\Mailer;
+namespace Ddrv\Mailer\Contract;
 
-use Closure;
 use Ddrv\Mailer\Exception\RecipientsListEmptyException;
+use Ddrv\Mailer\Exception\TransportException;
 
-interface TransportInterface
+interface Transport
 {
 
     /**
-     * Send mail
-     *
      * @param Message $message
      * @return bool
      * @throws RecipientsListEmptyException
+     * @throws TransportException
      */
     public function send(Message $message);
-
-    /**
-     * @param Closure $logger
-     * @return void
-     */
-    public function setLogger(Closure $logger);
 }
