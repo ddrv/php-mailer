@@ -3,16 +3,17 @@
 namespace Ddrv\Mailer\Transport;
 
 use Closure;
+use Ddrv\Mailer\Contract\Message;
+use Ddrv\Mailer\Contract\Transport;
 use Ddrv\Mailer\Exception\RecipientsListEmptyException;
-use Ddrv\Mailer\Message;
-use Ddrv\Mailer\TransportInterface;
+use Ddrv\Mailer\Exception\TransportException;
 
-final class SmtpTransport implements TransportInterface
+final class SmtpTransport implements Transport
 {
 
-    const ENCRYPTION_TLS = "tls";
+    const ENCRYPTION_TLS = 'tls';
 
-    const ENCRYPTION_SSL = "ssl";
+    const ENCRYPTION_SSL = 'ssl';
 
     /**
      * @var resource
@@ -20,14 +21,9 @@ final class SmtpTransport implements TransportInterface
     private $socket;
 
     /**
-     * @var string
+     * @var string[]
      */
-    private $email;
-
-    /**
-     * @var Closure
-     */
-    private $logger;
+    private $sender;
 
     /**
      * @var string
@@ -55,27 +51,56 @@ final class SmtpTransport implements TransportInterface
     private $connectDomain;
 
     /**
+     * @var bool
+     */
+    private $tls = false;
+
+    /**
+     * @var Closure|null
+     */
+    private $requestLogger;
+
+    /**
+     * @var Closure|null
+     */
+    private $responseLogger;
+
+    /**
      * @param string $host
      * @param int $port
      * @param string $user
      * @param string $pass
-     * @param string $email
+     * @param string $sender
+     * @param string $name
      * @param string $encryption
      * @param string $domain
      */
-    public function __construct($host, $port, $user, $pass, $email, $encryption = self::ENCRYPTION_TLS, $domain = "")
-    {
-        $this->email = (string)$email;
+    public function __construct(
+        $host,
+        $port,
+        $user,
+        $pass,
+        $sender,
+        $name = '',
+        $encryption = self::ENCRYPTION_TLS,
+        $domain = ''
+    ) {
+        $this->sender = array(
+            'email' => (string)$sender,
+            'name' => (string)$name,
+        );
         $host = (string)$host;
         $port = (int)$port;
         $user = (string)$user;
         $pass = (string)$pass;
         $domain = (string)$domain;
+        $encryption = trim(mb_strtolower($encryption));
         if ($host && $port) {
-            if (in_array($encryption, array(self::ENCRYPTION_TLS, self::ENCRYPTION_SSL))) {
-                $host = "$encryption://$host";
+            $scheme = $encryption === self::ENCRYPTION_SSL ? 'ssl' : 'tcp';
+            if ($encryption === self::ENCRYPTION_TLS) {
+                $this->tls = true;
             }
-            $this->connectHost = $host;
+            $this->connectHost = $scheme . '://' . $host;
             $this->connectPort = $port;
             $this->connectUser = $user;
             $this->connectPassword = $pass;
@@ -88,13 +113,59 @@ final class SmtpTransport implements TransportInterface
         if ($this->socket) {
             return;
         }
-        $this->socket = fsockopen($this->connectHost, $this->connectPort, $errCode, $errMessage, 30);
-        $test = fgets($this->socket, 512);
+        $addr = $this->connectHost . ':' . $this->connectPort;
+        $this->socket = stream_socket_client($addr, $errCode, $errMessage, 10);
+        if (!$this->socket) {
+            throw new TransportException('Connection Error: ' . $errCode . ' ' . $errMessage, 1);
+        }
+        stream_set_timeout($this->socket, -1);
+        $test = $this->read();
+
         unset($test);
-        $this->smtpCommand("EHLO {$this->connectDomain}");
-        $this->smtpCommand("AUTH LOGIN");
-        $this->smtpCommand(base64_encode($this->connectUser));
-        $this->smtpCommand(base64_encode($this->connectPassword));
+        $options = $this->options();
+        if (array_key_exists('STARTTLS', $options) && $this->tls) {
+            $this->smtpCommand('STARTTLS');
+            $mask = STREAM_CRYPTO_METHOD_TLSv1_0_CLIENT | STREAM_CRYPTO_METHOD_TLSv1_1_CLIENT
+                | STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT | STREAM_CRYPTO_METHOD_SSLv23_CLIENT;
+            stream_socket_enable_crypto($this->socket, true, $mask);
+            $options = $this->options();
+        }
+        $types = array('PLAIN', 'LOGIN');
+        $supported = array_key_exists('AUTH', $options) ? $options['AUTH'] : array();
+        $types = array_intersect($types, $supported);
+        if ($types) {
+            $this->auth(array_shift($types));
+        }
+    }
+
+    private function auth($type)
+    {
+        switch ($type) {
+            case 'PLAIN':
+                $commands = array(base64_encode("\0" . $this->connectUser . "\0" . $this->connectPassword));
+                break;
+            case 'LOGIN':
+                $commands = array(
+                    base64_encode($this->connectUser),
+                    base64_encode($this->connectPassword),
+                );
+                break;
+            default:
+                throw new TransportException('Unsupported auth type ' . $type, 3);
+        }
+        $this->smtpCommand('AUTH ' . $type);
+        $response = array(
+            array(
+                'code' => 500,
+                'message' => 'Unknown error',
+            )
+        );
+        foreach ($commands as $command) {
+            $response = $this->smtpCommand($command);
+        }
+        if ($response[0]['code'] !== 235) {
+            throw new TransportException($response[0]['message'], $response[0]['code']);
+        }
     }
 
     /**
@@ -110,22 +181,15 @@ final class SmtpTransport implements TransportInterface
         if (!$message->getRecipients()) {
             throw new RecipientsListEmptyException();
         }
-        $this->smtpCommand("MAIL FROM: <{$this->email}>");
+        $message->setSender($this->sender['email'], $this->sender['name']);
+        $this->smtpCommand('MAIL FROM: <' . $this->sender['email'] . '>');
         foreach ($message->getRecipients() as $address) {
-            $this->smtpCommand("RCPT TO: <$address>");
+            $this->smtpCommand('RCPT TO: <' . $address . '>');
         }
-        $this->smtpCommand("DATA");
-        $data = $message->getRaw();
-        $this->smtpCommand("$data\r\n.");
+        $this->smtpCommand('DATA');
+        $data = $message->getHeadersRaw() . "\r\n\r\n" . $message->getBodyRaw() . "\r\n.\r\n";
+        $this->smtpCommand($data);
         return true;
-    }
-
-    /**
-     * @param Closure $logger
-     */
-    public function setLogger(Closure $logger)
-    {
-        $this->logger = $logger;
     }
 
     /**
@@ -134,27 +198,78 @@ final class SmtpTransport implements TransportInterface
      */
     private function smtpCommand($command)
     {
+        $logger = $this->requestLogger;
+        if (is_callable($logger)) {
+            $logger($command);
+        }
         $response = false;
         if ($this->socket) {
-            if (is_callable($this->logger)) {
-                $logger = $this->logger;
-                $logger("> $command");
-            }
-            fputs($this->socket, "$command\r\n");
-            $response = fgets($this->socket, 512);
-            if (is_callable($this->logger)) {
-                $logger = $this->logger;
-                $logger("< $response");
-            }
+            fputs($this->socket, $command . "\r\n");
+            $response = $this->read();
         }
         return $response;
+    }
+
+    /**
+     * @return array[]
+     */
+    private function read()
+    {
+        $response = fgets($this->socket, 512);
+        do {
+            $meta = stream_get_meta_data($this->socket);
+            $unread = $meta['unread_bytes'];
+            if ($unread) {
+                $response .= fgets($this->socket, $unread + 512);
+            }
+        } while ($unread);
+        $logger = $this->responseLogger;
+        if (is_callable($logger)) {
+            $logger($response);
+        }
+        $stack = array();
+        foreach (explode("\r\n", $response) as $line) {
+            $stack[] = array(
+                'code' => (int)substr($line, 0, 3),
+                'message' => substr($line, 4),
+                'option' => substr($line, 3, 1) === '-',
+            );
+        }
+        return $stack;
+    }
+
+    /**
+     * @return array
+     */
+    private function options()
+    {
+        $options = array();
+        $data = $this->smtpCommand('EHLO ' . $this->connectDomain);
+        foreach ($data as $row) {
+            if ($row['option']) {
+                $arr = explode(' ', $row['message']);
+                $option = array_shift($arr);
+                $options[$option] = $arr ? $arr : $option;
+            }
+        }
+        return $options;
     }
 
     public function __destruct()
     {
         if (is_resource($this->socket)) {
-            $this->smtpCommand("QUIT");
+            $this->smtpCommand('QUIT');
             fclose($this->socket);
         }
+    }
+
+    public function setRequestLogger(Closure $logger = null)
+    {
+        $this->requestLogger = $logger;
+    }
+
+    public function setResponseLogger(Closure $logger = null)
+    {
+        $this->responseLogger = $logger;
     }
 }

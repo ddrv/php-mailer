@@ -2,90 +2,103 @@
 
 namespace Ddrv\Mailer;
 
+use Ddrv\Mailer\Contract\Message;
+use Ddrv\Mailer\Contract\Transport;
+use Ddrv\Mailer\Exception\RecipientsListEmptyException;
+use Ddrv\Mailer\Exception\TransportException;
 use Exception;
 
 final class Mailer
 {
 
-    const MAILER_VERSION = "4.1.5";
+    const MAILER_VERSION = "5.0.0";
 
     /**
-     * @var SpoolInterface
+     * @var string|null
      */
-    private $spool;
+    private $senderEmail;
 
     /**
-     * @var string
+     * @var string|null
      */
-    private $from;
+    private $senderName;
 
     /**
-     * Mailer constructor.
-     * @param SpoolInterface $spool
-     * @param string $from
+     * @var Transport
      */
-    public function __construct(SpoolInterface $spool, $from = "")
+    private $transport;
+
+    /**
+     * @param Transport $transport
+     * @param string|null $senderEmail
+     * @param string|null $senderName
+     */
+    public function __construct(Transport $transport, $senderEmail = null, $senderName = null)
     {
-        $this->spool = $spool;
-        $this->from = $from;
-    }
-
-    public function flush($limit = 0)
-    {
-        $this->spool->flush($limit);
-    }
-
-    /**
-     * @param Message $message
-     * @param int $priority
-     * @return self
-     */
-    public function send(Message $message, $priority = 0)
-    {
-        return $this->sendMail($message, false, $priority);
+        $this->transport = $transport;
+        $senderEmail = (string)$senderEmail;
+        $senderName = (string)$senderName;
+        $this->senderEmail = $senderEmail ? $senderEmail : null;
+        $this->senderName = $senderName ? $senderName : null;
     }
 
     /**
      * @param Message $message
-     * @param int $priority
-     * @return self
+     * @return bool
+     * @throws RecipientsListEmptyException
      */
-    public function personal(Message $message, $priority = 0)
+    public function send(Message $message)
     {
-        return $this->sendMail($message, true, $priority);
+        return (bool)$this->sendMail($message, false);
+    }
+
+    /**
+     * @param Message $message
+     * @return int
+     * @throws RecipientsListEmptyException
+     */
+    public function personal(Message $message)
+    {
+        return $this->sendMail($message, true);
     }
 
     /**
      * @param Message $message
      * @param bool $personal
-     * @param int $priority
-     * @return self
+     * @return int
+     * @throws RecipientsListEmptyException
+     * @throws TransportException
      */
-    private function sendMail(Message $message, $personal = false, $priority = 1)
+    private function sendMail(Message $message, $personal = false)
     {
-        if ($this->from) {
-            $message->setHeader("From", $this->from);
+        if (!$message->getRecipients()) {
+            throw new RecipientsListEmptyException();
         }
-        $priority = (int)$priority;
-        $params = array();
-        if ($priority < 1) {
-            $priority = 0;
+        if ($this->senderEmail) {
+            $message->setSender($this->senderEmail, $this->senderName);
         }
-        if ($priority) {
-            $fn = array($this->spool, "add");
-            $params[1] = $priority;
+        $messages = array();
+        if ($personal) {
+            $recipients = $message->getRecipients();
+            foreach ($recipients as $recipient) {
+                $name = $message->getRecipientName($recipient);
+                $new = clone $message;
+                $messages[] = $new->removeRecipients()->addRecipient($recipient, $name);
+            }
         } else {
-            $fn = array($this->spool, "send");
+            $messages[] = $message;
         }
-        $messages = $personal ? $message->getPersonalMessages() : array($message);
+        $result = 0;
         foreach ($messages as $msg) {
-            $params[0] = $msg;
-            ksort($params);
             try {
-                call_user_func_array($fn, $params);
-            } catch (Exception $e) {
+                $ok = $this->transport->send($msg);
+            } catch (RecipientsListEmptyException $e) {
+                $ok = false;
+            }
+            if ($ok) {
+                $result++;
             }
         }
-        return $this;
+        return $result;
     }
 }

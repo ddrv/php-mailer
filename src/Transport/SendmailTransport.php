@@ -2,12 +2,11 @@
 
 namespace Ddrv\Mailer\Transport;
 
-use Closure;
+use Ddrv\Mailer\Contract\Message;
+use Ddrv\Mailer\Contract\Transport;
 use Ddrv\Mailer\Exception\RecipientsListEmptyException;
-use Ddrv\Mailer\Message;
-use Ddrv\Mailer\TransportInterface;
 
-final class SendmailTransport implements TransportInterface
+final class SendmailTransport implements Transport
 {
 
     /**
@@ -15,12 +14,7 @@ final class SendmailTransport implements TransportInterface
      */
     private $options;
 
-    /**
-     * @var Closure
-     */
-    private $logger;
-
-    public function __construct($options = "")
+    public function __construct($options = '')
     {
         $this->options = (string)$options;
     }
@@ -30,26 +24,12 @@ final class SendmailTransport implements TransportInterface
         if (!$message->getRecipients()) {
             throw new RecipientsListEmptyException();
         }
-        $subject = $message->getSubject();
-        $body = $message->getBody();
-        $headers = implode("\r\n", $message->getHeaders());
-        $to = implode(", ", $message->getRecipients());
-        if (is_callable($this->logger)) {
-            $logger = $this->logger;
-            $log = "mail(";
-            $log .= "\"" . addslashes($to) . "\", ";
-            $log .= "\"" . addslashes($subject) . "\", ";
-            $log .= "\"" . addslashes($body) . "\", ";
-            $log .= "\"" . addslashes($headers) . "\", ";
-            $log .= "\"" . addslashes($this->options) . "\", ";
-            $log .= ");";
-            $logger($log);
-        }
-        return mail($to, $subject, $body, $headers, $this->options);
-    }
-
-    public function setLogger(Closure $logger)
-    {
-        $this->logger = $logger;
+        return mail(
+            implode(', ', $message->getRecipients()),
+            $message->getBodyRaw(),
+            $message->getBodyRaw(),
+            $message->getHeadersRaw(),
+            $this->options
+        );
     }
 }

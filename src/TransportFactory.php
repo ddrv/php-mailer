@@ -2,6 +2,7 @@
 
 namespace Ddrv\Mailer;
 
+use Ddrv\Mailer\Contract\Transport;
 use Ddrv\Mailer\Transport\FakeTransport;
 use Ddrv\Mailer\Transport\FileTransport;
 use Ddrv\Mailer\Transport\SendmailTransport;
@@ -13,7 +14,7 @@ final class TransportFactory
 
     /**
      * @param string $transportUrl
-     * @return TransportInterface
+     * @return Transport
      * @throws InvalidArgumentException
      */
     public static function make($transportUrl)
@@ -33,7 +34,8 @@ final class TransportFactory
                 $defaultEncryption = SmtpTransport::ENCRYPTION_TLS;
                 $encryption = array_key_exists('encryption', $query) ? $query['encryption'] : $defaultEncryption;
                 $domain = array_key_exists('domain', $query) ? $query['domain'] : '';
-                $transport = new SmtpTransport($host, $port, $user, $password, $sender, $encryption, $domain);
+                $name = array_key_exists('name', $query) ? $query['name'] : '';
+                $transport = new SmtpTransport($host, $port, $user, $password, $sender, $name, $encryption, $domain);
                 break;
             case 'sendmail':
                 $options = array_key_exists('options', $query) ? $query['options'] : null;
@@ -45,9 +47,6 @@ final class TransportFactory
                     $path = mb_substr($path, 1);
                 }
                 $transport = new FileTransport($path);
-                break;
-            case 'fake':
-                $transport = new FakeTransport();
                 break;
             default:
                 $transport = new FakeTransport();

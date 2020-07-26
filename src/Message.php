@@ -2,26 +2,44 @@
 
 namespace Ddrv\Mailer;
 
-final class Message
+use Ddrv\Mailer\Contract\Message as MessageContract;
+use Ddrv\Mailer\Exception\HeaderNotModifiedException;
+use Ddrv\Mailer\Exception\InvalidAttachmentNameException;
+use Ddrv\Mailer\Exception\InvalidEmailException;
+use Exception;
+
+final class Message implements MessageContract
 {
+
+    /**
+     * @var string[]
+     */
+    private $headers;
+
+    /**
+     * @var array
+     */
+    private $recipients = array();
 
     /**
      * @var string
      */
-    private $subject;
+    private $id;
 
     /**
-     * @var array
+     * @var string
      */
-    private $message = array(
-        "plain" => null,
-        "html" => null,
-    );
+    private $boundary;
 
     /**
-     * @var array
+     * @var string
      */
-    private $headers = array();
+    private $html;
+
+    /**
+     * @var string
+     */
+    private $text;
 
     /**
      * @var array
@@ -29,410 +47,586 @@ final class Message
     private $attachments = array();
 
     /**
-     * @var string[]
+     * @var array
      */
-    private $to = array();
+    private $contents;
 
     /**
-     * @var string[]
+     * @var array
      */
-    private $cc = array();
+    private $protectedHeaders = array(
+        'subject' => array('setSubject($subject)', 'removeSubject()'),
+        'from' => array('setSender($email, $name)', 'removeSender()'),
+        'to' => array('addRecipient($email, $name, \'to\')', 'removeRecipients(\'to\')'),
+        'cc' => array('addRecipient($email, $name, \'cc\')', 'removeRecipients(\'cc\')'),
+        'bcc' => array('addRecipient($email, $name, \'bcc\')', 'removeRecipients(\'bcc\')'),
+        'content-transfer-encoding' => null,
+        'content-type' => null,
+        'mime-version' => null,
+        'message-id' => null,
+    );
 
     /**
-     * @var string[]
+     * @param string|null $subject
+     * @param string|null $html
+     * @param string|null $text
      */
-    private $bcc = array();
-
-    /**
-     * @var string
-     */
-    private $boundary;
-
-    public function __construct($subject = null, $html = null, $plain = null)
+    public function __construct($subject = null, $html = null, $text = null)
     {
-        $this->boundary = dechex(rand(0, 16777215));
-        $this->setHeader("MIME-Version", "1.0");
-        $this->setHeaderRaw("Content-Type", "multipart/mixed; boundary=\"r={$this->boundary}\"");
-        $this->setHeader("Content-Transfer-Encoding", "7bit");
-        $mailer = sprintf("ddrv/mailer-%s (https://github.com/ddrv/mailer)", Mailer::MAILER_VERSION);
-        $this->setHeader("X-Mailer", $mailer);
+        $this->id = $this->randomString() . $this->randomString() . $this->randomString() . $this->randomString();
+        $this->boundary = $this->randomString();
+
+        $this->headers = array(
+            'mime-version' => '1.0',
+            'message-id' => '<' . $this->id . '>',
+            'content-type' => 'text/plain; charset=UTF-8',
+            'content-transfer-encoding' => 'quoted-printable',
+            'x-mailer' => 'ddrv/mailer-' . Mailer::MAILER_VERSION . ' (https://github.com/ddrv/php-mailer)',
+        );
         $this->setSubject($subject);
-        $this->setHtmlBody($html);
-        $this->setPlainBody($plain);
+        $this->setHtml($html);
+        $this->setText($text);
     }
 
+    public function __clone()
+    {
+        $this->id = $this->randomString() . $this->randomString() . $this->randomString() . $this->randomString();
+        $this->setAnyHeader('message-id', '<' . $this->id . '>');
+        $sender = $this->getHeader('sender');
+        preg_match('/(?<name>.*)?<(?<email>[^>]+)>$/ui', $sender, $matches);
+        if (array_key_exists('email', $matches)) {
+            $email = $matches['email'];
+            $name = array_key_exists('name', $matches) ? $matches['name'] : '';
+            $this->setSender($email, $name);
+        }
+    }
+
+    /**
+     * @param string|null $subject Subject of message.
+     * @return self
+     */
     public function setSubject($subject)
     {
-        $this->subject = (string)$subject;
-        $this->setHeader("Subject", $this->subject);
-        return $this;
-    }
-
-    public function setHtmlBody($text)
-    {
-        if (is_null($text)) {
-            $this->message["html"] = null;
+        $subject = (string)$subject;
+        if ($subject) {
+            $this->setAnyHeader('subject', $subject);
         } else {
-            $this->message["html"] = base64_encode($text);
+            $this->removeAnyHeader('subject');
         }
         return $this;
     }
 
-    public function setPlainBody($text)
+    /**
+     * @param string|null $html HTML text of message.
+     * @return self
+     */
+    public function setHtml($html = null)
     {
-        if (is_null($text)) {
-            $this->message["plain"] = null;
-        } else {
-            $this->message["plain"] = base64_encode($text);
+        if (!is_null($html)) {
+            $html = trim((string)$html);
+            if (!$html) {
+                $html = null;
+            }
         }
+        $this->html = $html;
+        $this->contents = array();
+        $this->defineContentType();
         return $this;
     }
 
-    public function addTo($email, $name = "")
+    /**
+     * @param string|null $text Plain text of message.
+     * @return self
+     */
+    public function setText($text = null)
     {
-        $this->addAddress("to", $email, $name);
-        $this->replaceHeaderTo();
-        return $this;
-    }
-
-    public function removeTo($email)
-    {
-        if (array_key_exists($email, $this->to)) {
-            unset($this->to[$email]);
+        if (!is_null($text)) {
+            $text = trim((string)$text);
+            if (!$text) {
+                $text = null;
+            }
         }
-        $this->replaceHeaderTo();
+        $this->text = $text;
+        $this->defineContentType();
         return $this;
     }
 
-    public function getTo()
-    {
-        return $this->to;
-    }
-
-    public function addCc($email, $name = "")
-    {
-        $this->addAddress("cc", $email, $name);
-        $this->replaceHeaderCc();
-        return $this;
-    }
-
-    public function removeCc($email)
-    {
-        if (array_key_exists($email, $this->cc)) {
-            unset($this->cc[$email]);
-        }
-        $this->replaceHeaderCc();
-        return $this;
-    }
-
-    public function getCc()
-    {
-        return $this->cc;
-    }
-
-    public function addBcc($email, $name = "")
-    {
-        $this->addAddress("bcc", $email, $name);
-        $this->replaceHeaderBcc();
-        return $this;
-    }
-
-    public function removeBcc($email)
-    {
-        if (array_key_exists($email, $this->bcc)) {
-            unset($this->bcc[$email]);
-        }
-        $this->replaceHeaderBcc();
-        return $this;
-    }
-
-    public function getBcc()
-    {
-        return $this->bcc;
-    }
-
-    public function setFrom($email, $name = "")
+    /**
+     * @param string $email Sender email.
+     * @param string|null $name Sender name.
+     * @return self
+     */
+    public function setSender($email, $name = null)
     {
         $email = (string)$email;
         if (!$email) {
+            $this->setAnyHeader('message-id', '<' . $this->id . '>');
             return $this;
         }
-        if (!$this->checkEmail($email)) {
-            return $this;
+        $this->checkEmail($email);
+        list($null, $host) = explode('@', $email . '@');
+        unset($null);
+        $id = $this->id;
+        if ($host) {
+            $id .= '@' . $host;
         }
+        $this->setAnyHeader('message-id', '<' . $id . '>');
         $contact = $this->getContact($email, $name);
-        $this->setHeaderRaw("From", $contact);
+        $this->setAnyHeader('from', $contact);
         return $this;
     }
 
-    public function getRecipients()
+    /**
+     * @return self
+     */
+    public function removeSender()
     {
-        return array_keys(array_replace($this->to, $this->cc, $this->bcc));
-    }
-
-    public function setHeader($header, $value)
-    {
-        $this->setHeaderRaw($header, $this->headerEncode($value));
+        $this->removeAnyHeader('from');
         return $this;
     }
 
-    private function setHeaderRaw($header, $value)
+    /**
+     * @param string $email Recipient email.
+     * @param string|null $name Recipient name.
+     * @param string $type Recipient type. May be 'to', 'cc' or 'bcc'. Default 'to'.
+     * @return self
+     * @throws InvalidEmailException
+     */
+    public function addRecipient($email, $name = null, $type = self::RECIPIENT_TO)
     {
-        $header = (string)$header;
-        //$value = str_replace(array("\r", "\n"), "", (string)$value);
-        if ($value) {
-            $this->headers[mb_strtolower($header)] = "$header: $value";
-        } else {
-            $this->removeHeader($header);
+        $type = mb_strtolower((string)$type);
+        if (!in_array($type, array(self::RECIPIENT_CC, self::RECIPIENT_BCC))) {
+            $type = self::RECIPIENT_TO;
         }
-        return $this;
-    }
-
-    public function removeHeader($header)
-    {
-        $header = mb_strtolower((string)$header);
-        if (array_key_exists($header, $this->headers)) {
-            unset($this->headers[$header]);
-        }
-        return $this;
-    }
-
-    public function attachFromString($name, $content, $mime = "application/octet-stream")
-    {
-        $name = $this->prepareAttachmentName($name);
-        $this->attachments[$name] = array(
-            "content" => base64_encode($content),
-            "mime" => $mime,
+        $email = (string)$email;
+        $this->checkEmail($email);
+        $this->recipients[$email] = array(
+            'header' => $type,
+            'name' => $name,
         );
         return $this;
     }
 
     /**
-     * @param $name
-     * @param $path
-     * @return $this
+     * @param string $email Recipient email.
+     * @return string|null Recipient name or null.
      */
-    public function attachFromFile($name, $path)
+    public function getRecipientName($email)
     {
-        $name = $this->prepareAttachmentName($name);
-        $stream = fopen($path, "r");
-        $content = "";
-        if ($stream) {
-            while (!feof($stream)) {
-                $content .= fgets($stream, 4096);
-            }
-            fclose($stream);
+        if (!array_key_exists($email, $this->recipients)) {
+            return null;
         }
-        if (!$content) {
-            return $this->detach($name);
+        return $this->recipients[$email]['name'];
+    }
+
+    /**
+     * @param string $email Recipient email.
+     * @return self
+     */
+    public function removeRecipient($email)
+    {
+        $email = (string)$email;
+        if (array_key_exists($email, $this->recipients)) {
+            unset($this->recipients[$email]);
         }
-        $mime = "application/octet-stream";
-        if (function_exists("mime_content_type")) {
-            /** @noinspection PhpComposerExtensionStubsInspection */
-            $mime = mime_content_type($path);
-        }
-        $this->attachments[$name] = array(
-            "content" => base64_encode($content),
-            "mime" => $mime,
-        );
         return $this;
     }
 
+    /**
+     * @param string $type Recipient type. May be 'to', 'cc', 'bcc' or null. Default null.
+     * @return self
+     */
+    public function removeRecipients($type = null)
+    {
+        $type = mb_strtolower((string)$type);
+        if (!in_array($type, array(self::RECIPIENT_TO, self::RECIPIENT_CC, self::RECIPIENT_BCC))) {
+            $type = '';
+        }
+        if (!$type) {
+            $this->recipients = array();
+            return $this;
+        }
+        foreach ($this->recipients as $email => $recipient) {
+            if ($recipient['header'] === $type) {
+                unset($this->recipients[$email]);
+            }
+        }
+        return $this;
+    }
+
+    /**
+     * @param string $name
+     * @param string $content
+     * @param string|null $mime
+     * @return self
+     */
+    public function attachFromString($name, $content, $mime = null)
+    {
+        $content = (string)$content;
+        $name = $this->prepareAttachmentName($name);
+        if (!$mime) {
+            $mime = ddrv_mailer_define_mime_type($content);
+        }
+        $this->attachments[$name] = array(
+            'content' => base64_encode($content),
+            'mime' => $mime,
+        );
+        $this->defineContentType();
+        return $this;
+    }
+
+    /**
+     * @param string $name
+     * @param string $path
+     * @param string|null $mime
+     * @return self
+     */
+    public function attachFromFile($name, $path, $mime = null)
+    {
+        if (file_exists($path)) {
+            $content = file_get_contents($path);
+        } else {
+            $content = '';
+        }
+        if (!$mime) {
+            $mime = ddrv_mailer_define_mime_type($content);
+        }
+        if ($mime === 'application/octet-stream') {
+            $mime = ddrv_mailer_define_mime_type($path);
+        }
+        return $this->attachFromString($name, $content, $mime);
+    }
+
+    /**
+     * @param string $name
+     * @return self
+     */
     public function detach($name)
     {
         $name = $this->prepareAttachmentName($name);
         if (array_key_exists($name, $this->attachments)) {
             unset($this->attachments[$name]);
         }
+        $this->defineContentType();
         return $this;
     }
 
+    /**
+     * @param string $id
+     * @param string $content
+     * @param string $mime
+     * @return self
+     */
+    public function setHtmlContentFromString($id, $content, $mime = 'application/octet-stream')
+    {
+        $content = (string)$content;
+        $id = $this->prepareContentId($id);
+        if (!$mime) {
+            $mime = ddrv_mailer_define_mime_type($content);
+        }
+        $this->contents[$id] = array(
+            'content' => base64_encode($content),
+            'mime' => $mime,
+        );
+        $this->defineContentType();
+        return $this;
+    }
+
+    /**
+     * @param string $id
+     * @param string $path
+     * @param string $mime
+     * @return self
+     */
+    public function setHtmlContentFromFile($id, $path, $mime = 'application/octet-stream')
+    {
+        if (file_exists($path)) {
+            $content = file_get_contents($path);
+        } else {
+            $content = '';
+        }
+        if (!$mime) {
+            $mime = ddrv_mailer_define_mime_type($content);
+        }
+        if ($mime === 'application/octet-stream') {
+            $mime = ddrv_mailer_define_mime_type($path);
+        }
+        return $this->setHtmlContentFromString($id, $content, $mime);
+    }
+
+    /**
+     * @param string $id
+     * @return self
+     */
+    public function unsetBodyHtmlContent($id)
+    {
+        $id = $this->prepareContentId($id);
+        if (array_key_exists($id, $this->attachments)) {
+            unset($this->attachments[$id]);
+        }
+        $this->defineContentType();
+        return $this;
+    }
+
+    /**
+     * @param string $header Header name.
+     * @param string $value Header values.
+     * @return self
+     * @throws HeaderNotModifiedException
+     */
+    public function setHeader($header, $value)
+    {
+        $value = trim((string)$value);
+        if (!$value) {
+            return $this->removeHeader($header);
+        }
+        $this->touchHeader($header, false);
+        $this->setAnyHeader($header, $value);
+        return $this;
+    }
+
+    /**
+     * @param string $header Header name.
+     * @return bool true if exists.
+     */
+    public function hasHeader($header)
+    {
+        $header = $this->prepareHeaderName($header);
+        return array_key_exists($header, $this->headers);
+    }
+
+    /**
+     * @param string $header Header name.
+     * @return string|null Header values.
+     */
+    public function getHeader($header)
+    {
+        $header = $this->prepareHeaderName($header);
+        return array_key_exists($header, $this->headers) ? $this->headers[$header] : null;
+    }
+
+    /**
+     * @param string $header Header name.
+     * @return string|null Header values.
+     * @throws HeaderNotModifiedException
+     */
+    public function removeHeader($header)
+    {
+        $this->touchHeader($header, true);
+        $this->removeAnyHeader($header);
+        return $this;
+    }
+
+    /**
+     * @return string[] Recipients emails.
+     */
+    public function getRecipients()
+    {
+        return array_keys($this->recipients);
+    }
+
+    /**
+     * @return string|null
+     */
     public function getSubject()
     {
-        return $this->subject;
+        return $this->getHeader('subject');
     }
 
-    public function getHeaders()
+    /**
+     * @return string Rew string as email headers
+     */
+    public function getHeadersRaw()
     {
-        $headers = array_values($this->headers);
-        return $headers;
-    }
-
-    private function createBodyMessagePart()
-    {
-        $boundary = "b={$this->boundary}";
-        $text = "\r\nContent-Type: multipart/alternative; boundary=\"$boundary\"\r\n\r\n";
-        $parts = array();
-        $parts[] = null;
-        if (!is_null($this->message["plain"])) {
-            $parts[] = $this->createBodyMessagePlainPart($this->message["plain"]);
+        $headers = array();
+        foreach ($this->headers as $name => $line) {
+            $header = $this->normalizeHeaderName($name);
+            $values = explode(',', $line);
+            foreach ($values as $value) {
+                $value = trim($value);
+                if (!$value) {
+                    continue;
+                }
+                $headers[] = $this->encodeHeader($header, $value);
+            }
         }
-        if (!is_null($this->message["html"])) {
-            $parts[] = $this->createBodyMessageHtmlPart($this->message["html"]);
+        foreach ($this->recipients as $email => $recipient) {
+            if (
+                !array_key_exists('header', $recipient)
+                || !is_string($recipient['header'])
+                || !in_array($recipient['header'], array(self::RECIPIENT_TO, self::RECIPIENT_CC, self::RECIPIENT_BCC))
+            ) {
+                continue;
+            }
+            $value = $this->getContact($email, $recipient['name']);
+            $headers[] = $this->encodeHeader(ucfirst($recipient['header']), $value);
         }
-        $parts[] = "--";
-        $text .= implode("--$boundary", $parts);
-        return $text . "\r\n\r\n";
+        return implode("\r\n", $headers);
     }
 
-    private function createBodyMessagePlainPart($content)
+    /**
+     * @return string Raw string of email body
+     */
+    public function getBodyRaw()
     {
-        $text = "\r\nContent-type: text/plain; charset=UTF-8\r\n";
-        $text .= "Content-Transfer-Encoding: base64\r\n\r\n";
-        $text .= chunk_split($content) . "\r\n";
-        return $text;
+        $info = $this->getBodyInfo(false);
+        return $info['data'];
     }
 
-    private function createBodyMessageHtmlPart($content)
+    /**
+     * @param bool $onlyType
+     * @return array
+     */
+    private function getBodyInfo($onlyType)
     {
-        $boundary = "h={$this->boundary}";
-        $text = "\r\nContent-Type: multipart/related; boundary=\"$boundary\"\r\n\r\n";
-        $parts = array();
-        $parts[] = null;
-
-        $part = "\r\nContent-type: text/html; charset=UTF-8\r\n";
-        $part .= "Content-Transfer-Encoding: base64\r\n\r\n";
-        $part .= chunk_split($content) . "\r\n";
-        $parts[] = $part;
-        $parts[] = "--";
-        $text .= implode("--$boundary", $parts);
-        return $text . "\r\n\r\n";
-    }
-
-    public function getBody()
-    {
-        $parts = array(
-            null,
-            $this->createBodyMessagePart(),
+        $result = array(
+            'type' => '',
+            'data' => '',
         );
+        $main = $this->getMainInfo($onlyType);
+        if (empty($this->attachments)) {
+            return $main;
+        }
+        $result['type'] = 'multipart/mixed; boundary="mail=_' . $this->boundary . '"';
+        if ($onlyType) {
+            return $result;
+        }
+        $eol = "\r\n";
+        $body = $eol;
+        $body .= $this->encodeHeader('Content-Type', $main['type']) . $eol;
+        $body .= 'Content-Transfer-Encoding: quoted-printable' . $eol;
+        $body .= $eol;
+        $body .= $main['data'];
+        $parts = array(null, $body);
         foreach ($this->attachments as $name => $attachment) {
-            $part = "\r\nContent-type: {$attachment["mime"]}; name=$name\r\n";
-            $part .= "Content-Transfer-Encoding: base64\r\n";
-            $part .= "Content-Disposition: attachment\r\n\r\n";
-            $part .= chunk_split($attachment["content"]) . "\r\n";
+            $part = $eol;
+            $part .= $this->encodeHeader('Content-Type', $attachment['mime'] . '; name=' . $name) . $eol;
+            $part .= $this->encodeHeader('Content-Disposition', 'attachment; filename=' . $name) . $eol;
+            $part .= 'Content-Transfer-Encoding: base64' . $eol;
+            $part .= $eol;
+            $part .= chunk_split($attachment['content']);
             $parts[] = $part;
         }
-        $parts[] = "--";
-        $body = implode("--r={$this->boundary}", $parts);
-        return $body;
-    }
-
-    public function getRaw()
-    {
-        $raw = sprintf("%s\r\n\r\n%s", implode("\r\n", $this->getHeaders()), $this->getBody());
-        return $raw;
-    }
-
-    public function getPersonalMessages()
-    {
-        $result = array();
-        $recipients = array_replace($this->to, $this->cc, $this->bcc);
-        foreach ($recipients as $email => $recipient) {
-            $clone = clone $this;
-            $clone->to = array(
-                $email => $recipient,
-            );
-            $clone->cc = array();
-            $clone->bcc = array();
-            $clone->replaceHeaderTo();
-            $clone->replaceHeaderCc();
-            $clone->replaceHeaderBcc();
-            $result[] = $clone;
-        }
+        $parts[] = '--';
+        $result['data'] = implode('--mail=_' . $this->boundary, $parts) . $eol;
         return $result;
     }
 
     /**
-     * Return correct attachment name.
-     *
-     * @param $name
-     * @return string
+     * @param bool $onlyType
+     * @return array
      */
-    private function prepareAttachmentName($name)
+    private function getMainInfo($onlyType)
     {
-        $name = (string)$name;
-        $name = preg_replace("/[\\\\\/\:\*\?\\\"<>]/ui", "_", $name);
-        if (!$name) {
-            $n = 1;
-            do {
-                $generated = "attachment_$n";
-                $n++;
-            } while (array_key_exists($generated, $this->attachments));
-            $name = $generated;
+        $mixed = false;
+        $result = array(
+            'type' => '',
+            'data' => '',
+        );
+        if (is_null($this->html) && is_null($this->text)) {
+            return $result;
         }
-        return $name;
+        $htmlInfo = $this->getHtmlInfo($onlyType);
+        if (!is_null($this->html) && is_null($this->text)) {
+            return $htmlInfo;
+        }
+        if (!is_null($this->text) && is_null($this->html)) {
+            $result['type'] = 'text/plain; charset=UTF-8';
+            if (!$onlyType) {
+                $result['data'] = quoted_printable_encode($this->text);
+            }
+            return $result;
+        }
+        if (!is_null($this->text) && !is_null($this->html)) {
+            $result['type'] = 'multipart/alternative; boundary="body=_' . $this->boundary . '"';
+            $mixed = true;
+        }
+        if ($onlyType) {
+            return $result;
+        }
+        if (!$mixed) {
+            $result['data'] = $htmlInfo['data'];
+            return $result;
+        }
+
+        $eol = "\r\n";
+        $text = $eol;
+        $text .= 'Content-Type: text/plain; charset=UTF-8' . $eol;
+        $text .= 'Content-Transfer-Encoding: quoted-printable' . $eol;
+        $text .= $eol;
+        $text .= quoted_printable_encode($this->text) . $eol;
+
+        $html = $eol;
+        $html .= $this->encodeHeader('Content-Type', $htmlInfo['type']) . $eol;
+        $html .= 'Content-Transfer-Encoding: quoted-printable' . $eol;
+        $html .= $eol;
+        $html .= $htmlInfo['data'] . $eol;
+
+        $parts = array(null, $text, $html, '--');
+        $result['data'] = implode('--body=_' . $this->boundary, $parts) . $eol;
+        return $result;
     }
 
-    private function checkEmail($email)
+    /**
+     * @param bool $onlyType
+     * @return array
+     */
+    private function getHtmlInfo($onlyType)
     {
-        $arr = explode("@", $email);
-        return (count($arr) == 2 && !empty($arr[0]) && !empty($arr[1]));
-    }
-
-    private function addAddress($type, $email, $name)
-    {
-        $email = (string)$email;
-        if (!$email) {
-            return false;
+        $mixed = false;
+        $result = array(
+            'type' => '',
+            'data' => '',
+        );
+        if (is_null($this->html)) {
+            return $result;
         }
-        if (!$this->checkEmail($email)) {
-            return false;
+        $raw = quoted_printable_encode($this->html);
+        if (empty($this->contents)) {
+            $result['type'] = 'text/html; charset=UTF-8';
+        } else {
+            $result['type'] = 'multipart/related; boundary="html=_' . $this->boundary . '"';
+            $mixed = true;
         }
-        $contact = $this->getContact($email, $name);
-        switch ($type) {
-            case "to":
-                $this->to[$email] = $contact;
-                break;
-            case "cc":
-                $this->cc[$email] = $contact;
-                break;
-            case "bcc":
-                $this->bcc[$email] = $contact;
-                break;
+        if ($onlyType) {
+            return $result;
         }
-        return true;
-    }
-
-    private function replaceHeaderTo()
-    {
-        $this->setHeaderRaw("To", implode(", ", $this->to));
-    }
-
-    private function replaceHeaderCc()
-    {
-        $this->setHeaderRaw("Cc", implode(", ", $this->cc));
-    }
-
-    private function replaceHeaderBcc()
-    {
-        $this->setHeaderRaw("Bcc", implode(", ", $this->bcc));
-    }
-
-    private function getContact($email, $name = "")
-    {
-        $email = (string)$email;
-        $name = preg_replace("/[^\pL\s,.\d]/ui", "", (string)$name);
-        $name = trim($name);
-        if (preg_match("/[^a-z0-9\s]+/ui", $name)) {
-            $name = $this->headerEncode($name);
+        if (!$mixed) {
+            $result['data'] = $raw;
+            return $result;
         }
-        if ($name) {
-            $name = "$name ";
+        $eol = "\r\n";
+        $html = $eol;
+        $html .= 'Content-Type: text/html; charset=UTF-8' . $eol;
+        $html .= 'Content-Transfer-Encoding: quoted-printable' . $eol;
+        $html .= $eol;
+        $html .= $raw . $eol;
+        $parts = array(null, $html);
+        foreach ($this->contents as $id => $content) {
+            $part = $eol;
+            $part .= $this->encodeHeader('Content-Type', $content['mime'] . '; name=' . $id) . $eol;
+            $part .= 'Content-Transfer-Encoding: base64' . $eol;
+            $part .= 'Content-Disposition: inline' . $eol;
+            $part .= $this->encodeHeader('Content-ID', '<' . $id . '>') . $eol . $eol;
+            $part .= chunk_split($content['content']);
+            $parts[] = $part;
         }
-        return "$name<$email>";
+        $parts[] = '--';
+        $result['data'] = implode('--html=_' . $this->boundary, $parts) . $eol;
+        return $result;
     }
 
     public function serialize()
     {
         $raw = array(
-            "subject" => $this->subject,
-            "message" => $this->message,
-            "headers" => $this->headers,
-            "attachments" => $this->attachments,
-            "to" => $this->to,
-            "cc" => $this->cc,
-            "bcc" => $this->bcc,
-            "boundary" => $this->boundary,
+            'id' => $this->id,
+            'headers' => $this->headers,
+            'boundary' => $this->boundary,
+            'html' => $this->html,
+            'text' => $this->text,
+            'attachments' => $this->attachments,
+            'contents' => $this->contents,
+            'recipients' => $this->recipients,
         );
         return serialize($raw);
     }
@@ -440,24 +634,224 @@ final class Message
     public function unserialize($serialized)
     {
         $raw = unserialize($serialized);
-        $keys = array(
-            "subject" => "",
-            "message" => "",
-            "headers" => array(),
-            "attachments" => array(),
-            "to" => array(),
-            "cc" => array(),
-            "bcc" => array(),
-            "boundary" => md5(time()),
+        $empty = array(
+            'id' => array(),
+            'headers' => array(),
+            'boundary' => null,
+            'html' => null,
+            'text' => null,
+            'attachments' => array(),
+            'contents' => array(),
+            'recipients' => array(),
         );
-        foreach ($keys as $key => $default) {
+        foreach ($empty as $key => $default) {
             $this->$key = array_key_exists($key, $raw) ? $raw[$key] : $default;
         }
     }
 
-    private function headerEncode($value)
+    /**
+     * @void
+     */
+    private function defineContentType()
     {
-        $value = mb_encode_mimeheader($value, "UTF-8", "B", "\r\n", 0);
-        return $value;
+        $info = $this->getBodyInfo(true);
+        $this->setAnyHeader('content-type', $info['type']);
+    }
+
+    /**
+     * @return string
+     */
+    private function randomString()
+    {
+        try {
+            $rand = random_int(268435456, 4294967295);
+        } catch (Exception $e) {
+            $rand = rand(268435456, 4294967295);
+        }
+        return dechex($rand);
+    }
+
+    /**
+     * @param string $header Header name.
+     * @param string $value Header values.
+     * @return self
+     */
+    private function setAnyHeader($header, $value)
+    {
+        $header = $this->prepareHeaderName($header);
+        $value = $this->prepareHeaderValue($value);
+        if (!$header) {
+            return $this;
+        }
+        if ($value) {
+            $this->headers[$header] = $value;
+        } else {
+            $this->removeAnyHeader($header);
+        }
+        return $this;
+    }
+
+    /**
+     * @param string $header Header name.
+     * @return string|null Header values.
+     */
+    private function removeAnyHeader($header)
+    {
+        $header = $this->prepareHeaderName($header);
+        if (array_key_exists($header, $this->headers)) {
+            unset($this->headers[$header]);
+        }
+        return $this;
+    }
+
+    /**
+     * @param string $header
+     * @param bool $removing
+     * @return bool
+     * @throws HeaderNotModifiedException
+     */
+    private function touchHeader($header, $removing)
+    {
+        $header = $this->prepareHeaderName($header);
+        $removing = (bool)$removing;
+        if (array_key_exists($header, $this->protectedHeaders)) {
+            $key = (int)$removing;
+            $method = is_array($this->protectedHeaders[$header]) ? $this->protectedHeaders[$header][$key] : null;
+            throw new HeaderNotModifiedException($header, $method);
+        }
+        return true;
+    }
+
+    /**
+     * @param string $name
+     * @return string
+     */
+    private function normalizeHeaderName($name)
+    {
+        if ($name === 'mime-version') {
+            return 'MIME-Version';
+        }
+        if ($name === 'message-id') {
+            return 'Message-ID';
+        }
+        $name = preg_replace_callback(
+            '/(^|-)[a-z]/ui',
+            function ($match) {
+                return strtoupper($match[0]);
+            },
+            $name
+        );
+        return $name;
+    }
+
+    /**
+     * @param string $name
+     * @return string
+     */
+    private function prepareHeaderName($name)
+    {
+        return mb_strtolower($this->prepareHeaderValue($name));
+    }
+
+    /**
+     * @param string $name
+     * @return string
+     */
+    private function prepareHeaderValue($name)
+    {
+        return trim(str_replace(array("\r", "\n"), "", (string)$name));
+    }
+
+    /**
+     * @param string $email
+     * @return void
+     * @throws InvalidEmailException
+     */
+    private function checkEmail($email)
+    {
+        $email = (string)$email;
+        list($u, $h) = explode('@', $email . '@');
+        if (empty($u) || empty($h)) {
+            throw new InvalidEmailException($email);
+        }
+        $user = trim($u);
+        $host = trim($h);
+        if ($user !== $u) {
+            throw new InvalidEmailException($email);
+        }
+        if ($host !== $h) {
+            throw new InvalidEmailException($email);
+        }
+    }
+
+    /**
+     * @param string $email
+     * @param string|null $name
+     * @return string
+     */
+    private function getContact($email, $name = '')
+    {
+        $email = (string)$email;
+        $name = preg_replace('/[^\pL\s,.\d]/ui', '', (string)$name);
+        $name = trim($name);
+        if ((strpos($name, ' ') !== false || strpos($name, "\t") !== false) && $name) {
+            $name = '"' . $name . '"';
+        }
+        if ($name) {
+            $name .= ' ';
+        }
+        return $name . '<' . $email . '>';
+    }
+
+    /**
+     * Return correct attachment name.
+     *
+     * @param $name
+     * @throws InvalidAttachmentNameException
+     * @return string
+     */
+    private function prepareAttachmentName($name)
+    {
+        $name = (string)$name;
+        if (!$name || preg_match('/[\\/*?"<>\\\\]/ui', $name)) {
+            throw new InvalidAttachmentNameException($name);
+        }
+        if (array_key_exists($name, $this->attachments)) {
+            $n = 1;
+            do {
+                $generated = $name . ' (' . $n . ')';
+                $n++;
+            } while (array_key_exists($generated, $this->attachments));
+            $name = $generated;
+        }
+        return $name;
+    }
+
+    /**
+     * Return correct attachment name.
+     *
+     * @param $name
+     * @throws InvalidAttachmentNameException
+     * @return string
+     */
+    private function prepareContentId($name)
+    {
+        $name = (string)$name;
+        return $name;
+    }
+
+    /**
+     * @param string $header
+     * @param string $value
+     * @return string
+     */
+    private function encodeHeader($header, $value)
+    {
+        $string = $header . ': ' . $value;
+//        if ($header === 'Content-Type' && strlen($string) <= 74) {
+//            return $string;
+//        }
+        $len = strlen($header) + 2;
+        return ddrv_mailer_encode_mime_header($string, $len);
     }
 }
