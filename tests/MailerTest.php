@@ -32,7 +32,6 @@ class MailerTest extends TestCase
         parent::setUp();
         $this->factory = new MessageFactory();
         $this->transport = new MockTransport(function ($log) {
-//            echo str_repeat('=', 76) . PHP_EOL . $log . PHP_EOL;
         });
         $this->mailer = new Mailer($this->transport);
     }
@@ -95,7 +94,7 @@ class MailerTest extends TestCase
 
     public static function assertMessage(MessageContract $expected, MessageContract $actual)
     {
-        self::assertSame($expected->getSubject(), $actual->getSubject());
+        self::assertSame($expected->getHeader('subject'), $actual->getHeader('subject'));
         self::assertSame($expected->getBodyRaw(), $actual->getBodyRaw());
         self::assertSame($expected->getHeadersRaw(), $actual->getHeadersRaw());
         self::assertSame(implode(', ', $expected->getRecipients()), implode(', ', $actual->getRecipients()));
