@@ -5,7 +5,6 @@ namespace Ddrv\Mailer\Transport;
 use Closure;
 use Ddrv\Mailer\Contract\Message;
 use Ddrv\Mailer\Contract\Transport;
-use Ddrv\Mailer\Exception\RecipientsListEmptyException;
 use Ddrv\Mailer\Exception\TransportException;
 
 final class SmtpTransport implements Transport
@@ -21,7 +20,7 @@ final class SmtpTransport implements Transport
     private $socket;
 
     /**
-     * @var string[]
+     * @var string
      */
     private $sender;
 
@@ -71,7 +70,6 @@ final class SmtpTransport implements Transport
      * @param string $user
      * @param string $pass
      * @param string $sender
-     * @param string $name
      * @param string $encryption
      * @param string $domain
      */
@@ -81,14 +79,10 @@ final class SmtpTransport implements Transport
         $user,
         $pass,
         $sender,
-        $name = '',
         $encryption = self::ENCRYPTION_TLS,
         $domain = ''
     ) {
-        $this->sender = array(
-            'email' => (string)$sender,
-            'name' => (string)$name,
-        );
+        $this->sender = (string)$sender;
         $host = (string)$host;
         $port = (int)$port;
         $user = (string)$user;
@@ -169,20 +163,14 @@ final class SmtpTransport implements Transport
     }
 
     /**
-     * @param Message $message
-     * @return bool
-     * @throws RecipientsListEmptyException
+     * @inheritDoc
      */
     public function send(Message $message)
     {
         if (!$this->socket) {
             $this->connect();
         }
-        if (!$message->getRecipients()) {
-            throw new RecipientsListEmptyException();
-        }
-        $message->setSender($this->sender['email'], $this->sender['name']);
-        $this->smtpCommand('MAIL FROM: <' . $this->sender['email'] . '>');
+        $this->smtpCommand('MAIL FROM: <' . $this->sender . '>');
         foreach ($message->getRecipients() as $address) {
             $this->smtpCommand('RCPT TO: <' . $address . '>');
         }

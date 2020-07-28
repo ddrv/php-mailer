@@ -34,8 +34,7 @@ final class TransportFactory
                 $defaultEncryption = SmtpTransport::ENCRYPTION_TLS;
                 $encryption = array_key_exists('encryption', $query) ? $query['encryption'] : $defaultEncryption;
                 $domain = array_key_exists('domain', $query) ? $query['domain'] : '';
-                $name = array_key_exists('name', $query) ? $query['name'] : '';
-                $transport = new SmtpTransport($host, $port, $user, $password, $sender, $name, $encryption, $domain);
+                $transport = new SmtpTransport($host, $port, $user, $password, $sender, $encryption, $domain);
                 break;
             case 'sendmail':
                 $options = array_key_exists('options', $query) ? $query['options'] : null;

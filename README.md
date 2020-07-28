@@ -41,10 +41,9 @@ $transport = new Ddrv\Mailer\Transport\SendmailTransport(
 $transport = new Ddrv\Mailer\Transport\SmtpTransport(
     'smtp.fight.club',  // host (REQUIRED)
     25,                 // port (REQUIRED)
-    'joe',              // login (REQUIRED)
-    'IAmJoesLiver',     // password (REQUIRED)
+    'info',             // login (REQUIRED)
+    'super-secret',     // password (REQUIRED)
     'joe@fight.club',   // sender email (REQUIRED)
-    'Fight Club',       // sender name
     null,               // encryption: 'tls', 'ssl' or null
     'http://fight.club' // domain
 );
@@ -114,12 +113,11 @@ $html .= '<img src="cid:poster" alt="Poster"/><img src="cid:ticket" alt="Your ti
 $message->setHtml($html);
 
 $message->setSender('support@fight.club', 'Support od Fight Club'); // The SMTP transport will set its value.
-$message->removeSender(); // If you decide to cancel. The SMTP transport will set its value.
 
-$message->addRecipient('tyler@fight.club', 'Tyler Durden', Ddrv\Mailer\Contract\Message::RECIPIENT_TO);
-$message->addRecipient('bob@fight.club', 'Robert Paulson', Ddrv\Mailer\Contract\Message::RECIPIENT_CC);
-$message->addRecipient('angel@fight.club', 'Angel Face', Ddrv\Mailer\Contract\Message::RECIPIENT_BCC);
-$message->addRecipient('r.chesler@car-vendor.com', 'Richard Chesler', Ddrv\Mailer\Contract\Message::RECIPIENT_TO);
+$message->addRecipient('tyler@fight.club', 'Tyler Durden', Ddrv\Mailer\Message::RECIPIENT_TO);
+$message->addRecipient('bob@fight.club', 'Robert Paulson', Ddrv\Mailer\Message::RECIPIENT_CC);
+$message->addRecipient('angel@fight.club', 'Angel Face', Ddrv\Mailer\Message::RECIPIENT_BCC);
+$message->addRecipient('r.chesler@car-vendor.com', 'Richard Chesler', Ddrv\Mailer\Message::RECIPIENT_TO);
 
 $message->getRecipientName('bob@fight.club'); // Returns 'Robert Paulson'.
 $message->getRecipientName('unknown@fight.club'); // Returns null.
@@ -127,15 +125,15 @@ $message->getRecipientName('unknown@fight.club'); // Returns null.
 $message->removeRecipient('r.chesler@car-vendor.com'); // If you change your mind.
 
 // You may remove recipients by type
-$message->removeRecipients(Ddrv\Mailer\Contract\Message::RECIPIENT_TO);
-$message->removeRecipients(Ddrv\Mailer\Contract\Message::RECIPIENT_CC);
-$message->removeRecipients(Ddrv\Mailer\Contract\Message::RECIPIENT_BCC);
+$message->removeRecipients(Ddrv\Mailer\Message::RECIPIENT_TO);
+$message->removeRecipients(Ddrv\Mailer\Message::RECIPIENT_CC);
+$message->removeRecipients(Ddrv\Mailer\Message::RECIPIENT_BCC);
 // Or all
 $message->removeRecipients();
 
-$message->addRecipient('tyler@fight.club', 'Tyler Durden', Ddrv\Mailer\Contract\Message::RECIPIENT_TO);
-$message->addRecipient('bob@fight.club', 'Robert Paulson', Ddrv\Mailer\Contract\Message::RECIPIENT_CC);
-$message->addRecipient('angel@fight.club', 'Angel Face', Ddrv\Mailer\Contract\Message::RECIPIENT_BCC);
+$message->addRecipient('tyler@fight.club', 'Tyler Durden', Ddrv\Mailer\Message::RECIPIENT_TO);
+$message->addRecipient('bob@fight.club', 'Robert Paulson', Ddrv\Mailer\Message::RECIPIENT_CC);
+$message->addRecipient('angel@fight.club', 'Angel Face', Ddrv\Mailer\Message::RECIPIENT_BCC);
 
 
 

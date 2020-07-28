@@ -4,7 +4,6 @@ namespace Ddrv\Mailer\Transport;
 
 use Ddrv\Mailer\Contract\Message;
 use Ddrv\Mailer\Contract\Transport;
-use Ddrv\Mailer\Exception\RecipientsListEmptyException;
 
 final class SendmailTransport implements Transport
 {
@@ -19,14 +18,14 @@ final class SendmailTransport implements Transport
         $this->options = (string)$options;
     }
 
+    /**
+     * @inheritDoc
+     */
     public function send(Message $message)
     {
-        if (!$message->getRecipients()) {
-            throw new RecipientsListEmptyException();
-        }
         return mail(
             implode(', ', $message->getRecipients()),
-            $message->getBodyRaw(),
+            '',
             $message->getBodyRaw(),
             $message->getHeadersRaw(),
             $this->options

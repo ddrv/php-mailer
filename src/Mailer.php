@@ -6,7 +6,6 @@ use Ddrv\Mailer\Contract\Message;
 use Ddrv\Mailer\Contract\Transport;
 use Ddrv\Mailer\Exception\RecipientsListEmptyException;
 use Ddrv\Mailer\Exception\TransportException;
-use Exception;
 
 final class Mailer
 {
@@ -46,6 +45,7 @@ final class Mailer
      * @param Message $message
      * @return bool
      * @throws RecipientsListEmptyException
+     * @throws TransportException
      */
     public function send(Message $message)
     {
@@ -67,7 +67,6 @@ final class Mailer
      * @param bool $personal
      * @return int
      * @throws RecipientsListEmptyException
-     * @throws TransportException
      */
     private function sendMail(Message $message, $personal = false)
     {
@@ -77,26 +76,20 @@ final class Mailer
         if ($this->senderEmail) {
             $message->setSender($this->senderEmail, $this->senderName);
         }
-        $messages = array();
         if ($personal) {
-            $recipients = $message->getRecipients();
-            foreach ($recipients as $recipient) {
-                $name = $message->getRecipientName($recipient);
-                $new = clone $message;
-                $messages[] = $new->removeRecipients()->addRecipient($recipient, $name);
-            }
+            $messages = $message->getPersonalMessages();
         } else {
-            $messages[] = $message;
+            $messages = array($message);
         }
         $result = 0;
         foreach ($messages as $msg) {
             try {
-                $ok = $this->transport->send($msg);
-            } catch (RecipientsListEmptyException $e) {
-                $ok = false;
-            }
-            if ($ok) {
+                $this->transport->send($msg);
                 $result++;
+            } catch (TransportException $exception) {
+                if (!$personal) {
+                    throw $exception;
+                }
             }
         }
         return $result;

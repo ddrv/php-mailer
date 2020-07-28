@@ -4,7 +4,6 @@ namespace Ddrv\Mailer\Transport;
 
 use Ddrv\Mailer\Contract\Message;
 use Ddrv\Mailer\Contract\Transport;
-use Ddrv\Mailer\Exception\RecipientsListEmptyException;
 
 final class FileTransport implements Transport
 {
@@ -22,11 +21,11 @@ final class FileTransport implements Transport
         $this->dir = $dir;
     }
 
+    /**
+     * @inheritDoc
+     */
     public function send(Message $message)
     {
-        if (!$message->getRecipients()) {
-            throw new RecipientsListEmptyException();
-        }
         $content = $message->getHeadersRaw() . "\r\n\r\n" . $message->getBodyRaw();
         foreach ($message->getRecipients() as $email) {
             $arr = explode('@', $email);
