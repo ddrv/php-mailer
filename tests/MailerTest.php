@@ -27,9 +27,9 @@ class MailerTest extends TestCase
      */
     private $factory;
 
-    public function setUp()
+    public function __construct($name = null, $data = array(), $dataName = '')
     {
-        parent::setUp();
+        parent::__construct($name, (array)$data, $dataName);
         $this->factory = new MessageFactory();
         $this->transport = new MockTransport(function ($log) {
         });
