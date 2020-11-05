@@ -3,7 +3,7 @@ name: CI
 on: [push, pull_request]
 
 jobs:
-  tests-php-5.3:
+  tests-php-5_3:
     runs-on: ubuntu-latest
 
     strategy:
