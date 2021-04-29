@@ -962,6 +962,9 @@ final class Message implements MessageContract
             if (!$coding && $char === 61 && preg_match('/;(\s+)?([a-z0-9\-]+)(\s+)?(=(\s+)?\"[^\"]+)?/ui', $result)) {
                 $ascii = true;
             }
+            if ($coding && $symbol === ' ') {
+                $ascii = false;
+            }
             if ($ascii) {
                 if ($coding) {
                     $coding = false;
@@ -981,8 +984,13 @@ final class Message implements MessageContract
                 $add += 3;
             }
             if ($position + $add >= $max) {
-                $line = "=\r\n $line";
-                $position = $add + 1;
+                if ($coding) {
+                    $line = "?=\r\n =?utf-8?Q?$line";
+                    $position = $add + 11;
+                } else {
+                    $line = "=\r\n $line";
+                    $position = $add + 1;
+                }
             }
             $result .= $line;
             $position += $add;
