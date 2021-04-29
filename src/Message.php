@@ -959,10 +959,6 @@ final class Message implements MessageContract
             if ($char === 32 && $num + 1 === $all) {
                 $ascii = false;
             }
-            if ($num < $offset) {
-                $ascii = true;
-                $coding = false;
-            }
             if (!$coding && $char === 61 && preg_match('/;(\s+)?([a-z0-9\-]+)(\s+)?(=(\s+)?\"[^\"]+)?/ui', $result)) {
                 $ascii = true;
             }
