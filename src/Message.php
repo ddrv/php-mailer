@@ -939,44 +939,43 @@ final class Message implements MessageContract
     {
         $max = 74;
         $offset = strlen($header) + 2;
-        $symbols = str_split($value);
+        $letters = mb_str_split($value);
+        $hasOptions = preg_match('/;(\s+)?([a-z0-9\-]+)(\s+)?(=(\s+)?\"[^\"]+)?/ui', $value);
         unset($value);
         $result = $header . ': ';
         $coding = false;
-        $all = count($symbols);
+        $all = count($letters);
         $position = $offset;
-        foreach ($symbols as $num => $symbol) {
+        foreach ($letters as $num => $letter) {
             $line = '';
-            $add = 0;
-            $char = ord($symbol);
-            $ascii = ($char >= 32 && $char <= 60) || ($char >= 62 && $char <= 126);
-            if ($char === 32 && $num + 1 === $all) {
-                $ascii = false;
-            }
-            if (!$coding && $char === 61 && preg_match('/;(\s+)?([a-z0-9\-]+)(\s+)?(=(\s+)?\"[^\"]+)?/ui', $result)) {
-                $ascii = true;
-            }
-            if ($coding && $symbol === ' ') {
-                $ascii = false;
-            }
-            if ($ascii) {
-                if ($coding) {
-                    $coding = false;
-                    $line = '?=' . $symbol;
-                    $add = 3;
-                } else {
-                    $line = $symbol;
-                    $add = 1;
-                }
+            /**
+             * @var string $char
+             * @var bool $encoded
+             */
+
+            if (!$coding && $letter === '=' && $hasOptions) {
+                $char = '=';
+                $encoded = false;
             } else {
+                list($char, $encoded) = $this->encodeLetter($letter, $num, $all, $coding);
+            }
+
+            if ($encoded) {
                 if (!$coding) {
                     $coding = true;
                     $line = '=?utf-8?Q?';
-                    $add = 10;
                 }
-                $line .= $this->map[$char];
-                $add += 3;
+                $line .= $char;
+            } else {
+                if ($coding) {
+                    $coding = false;
+                    $line = '?=' . $char;
+                } else {
+                    $line = $char;
+                }
             }
+            $add = strlen($line);
+
             if ($position + $add >= $max) {
                 if ($coding) {
                     $line = "?=\r\n =?utf-8?Q?$line";
@@ -996,16 +995,87 @@ final class Message implements MessageContract
             }
             $result .= $line;
         }
-        return $result;
+        return str_replace(
+            array("\t\r\n", " \r\n"),
+            array("=09\r\n", "=20\r\n"),
+            $result
+        );
     }
 
     /**
-     * @param string $data
+     * @param string $letter
+     * @param int $position
+     * @param int $length
+     * @return array
+     */
+    private function encodeLetter($letter, $position, $length, $coding)
+    {
+        $result = '';
+        if ($letter === ' ' && $coding) {
+            return array($this->encodeSymbol($letter, true), true);
+        }
+        $isNeedEncode = (strlen($letter) > 1);
+        $symbols = str_split($letter);
+        foreach ($symbols as $symbol) {
+            if ($this->isNeedEncode($symbol, $position, $length)) {
+                $isNeedEncode = true;
+            }
+        }
+        foreach ($symbols as $symbol) {
+            $result .= $this->encodeSymbol($symbol, $isNeedEncode);
+        }
+        return array($result, $isNeedEncode);
+    }
+
+    /**
+     * @param string$symbol
+     * @param int $position
+     * @param int $length
+     * @return bool
+     */
+    private function isNeedEncode($symbol, $position, $length)
+    {
+        $char = ord($symbol);
+        $isNeedEncode = !($char === 9 || ($char >= 32 && $char <= 60) || ($char >= 62 && $char <= 126));
+        if ((in_array($char, array(9, 20, 32)) && $position + 1 === $length)) {
+            $isNeedEncode = true;
+        }
+        return $isNeedEncode;
+    }
+
+    /**
+     * @param string $symbol
+     * @param bool $isNeedEncode
      * @return string
      */
-    private function encodeBody($data)
+    private function encodeSymbol($symbol, $isNeedEncode)
     {
-        return quoted_printable_encode($data);
+        $char = ord($symbol);
+
+        if ($isNeedEncode) {
+            return $this->map[$char];
+        }
+        return $symbol;
+    }
+
+    /**
+     * @param string $string
+     * @return string
+     */
+    private function encodeBody($string)
+    {
+        $string = quoted_printable_encode($string);
+        $string = str_replace(
+            array("\t\r\n", " \r\n"),
+            array("=09\r\n", "=20\r\n"),
+            $string
+        );
+        $last = ord(substr($string, -1));
+        if (in_array($last, array(9, 20))) {
+            $string = substr_replace($string, sprintf('=%\'.02d', $last), -1);
+        }
+
+        return $string;
     }
 
     /**

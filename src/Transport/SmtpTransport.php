@@ -174,7 +174,11 @@ final class SmtpTransport implements Transport
             $this->smtpCommand('RCPT TO: <' . $address . '>');
         }
         $this->smtpCommand('DATA');
-        $data = $message->getHeadersRaw() . "\r\n\r\n" . $message->getBodyRaw() . "\r\n.\r\n";
+        $data = $message->getHeadersRaw()
+            . "\r\n\r\n"
+            . str_replace("\r\n.", "\r\n..", $message->getBodyRaw())
+            . "\r\n.\r\n"
+        ;
         $this->smtpCommand($data);
         return true;
     }
