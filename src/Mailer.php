@@ -9,7 +9,7 @@ use Ddrv\Mailer\Exception\TransportException;
 
 final class Mailer
 {
-    const MAILER_VERSION = "5.0.2";
+    const MAILER_VERSION = "5.0.4";
 
     /**
      * @var string|null
