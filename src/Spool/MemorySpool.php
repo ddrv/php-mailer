@@ -7,7 +7,6 @@ use Ddrv\Mailer\Contract\Spool;
 
 final class MemorySpool implements Spool
 {
-
     /**
      * @var Message[][]
      */

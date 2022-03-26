@@ -6,7 +6,6 @@ use InvalidArgumentException;
 
 final class HeaderNotModifiedException extends InvalidArgumentException
 {
-
     public function __construct($header, $method = null)
     {
         $message = 'header "' . $header . '" is not modified.';

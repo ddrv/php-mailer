@@ -9,7 +9,6 @@ use Ddrv\Mailer\Exception\TransportException;
 
 final class Mailer
 {
-
     const MAILER_VERSION = "5.0.2";
 
     /**

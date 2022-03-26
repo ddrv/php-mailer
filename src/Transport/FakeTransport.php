@@ -7,7 +7,6 @@ use Ddrv\Mailer\Contract\Transport;
 
 final class FakeTransport implements Transport
 {
-
     /**
      * @inheritDoc
      */

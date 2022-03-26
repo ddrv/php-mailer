@@ -9,7 +9,6 @@ use Ddrv\Mailer\Exception\TransportException;
 
 final class SmtpTransport implements Transport
 {
-
     const ENCRYPTION_TLS = 'tls';
 
     const ENCRYPTION_SSL = 'ssl';

@@ -6,7 +6,6 @@ use Ddrv\Mailer\Message;
 
 final class MessageFactory
 {
-
     private $from;
 
     public function __construct()

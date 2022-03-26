@@ -6,8 +6,6 @@ use Serializable;
 
 interface Message extends Serializable
 {
-
-
     /**
      * @param string $email Sender email.
      * @param string|null $name Sender name.

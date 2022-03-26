@@ -11,7 +11,6 @@ use Stuff\Ddrv\Mailer\Transport\MockTransport;
 
 class MailerTest extends TestCase
 {
-
     /**
      * @var Mailer
      */

@@ -6,7 +6,6 @@ use Ddrv\Mailer\Exception\TransportException;
 
 interface Transport
 {
-
     /**
      * @param Message $message
      * @return bool

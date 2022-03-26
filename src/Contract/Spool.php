@@ -4,7 +4,6 @@ namespace Ddrv\Mailer\Contract;
 
 interface Spool
 {
-
     /**
      * @param Message $message
      * @param int $attempt

@@ -9,7 +9,6 @@ use Exception;
 
 final class SpoolTransport implements Transport
 {
-
     /**
      * @var Transport
      */

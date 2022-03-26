@@ -10,7 +10,6 @@ use Exception;
 
 final class Message implements MessageContract
 {
-
     const RECIPIENT_TO = 'to';
     const RECIPIENT_CC = 'cc';
     const RECIPIENT_BCC = 'bcc';

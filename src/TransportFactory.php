@@ -11,7 +11,6 @@ use InvalidArgumentException;
 
 final class TransportFactory
 {
-
     /**
      * @param string $transportUrl
      * @return Transport
