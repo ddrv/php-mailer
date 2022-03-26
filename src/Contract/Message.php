@@ -9,7 +9,7 @@ interface Message extends Serializable
     /**
      * @param string $email Sender email.
      * @param string|null $name Sender name.
-     * @return self
+     * @return $this
      */
     public function setSender($email, $name = null);
 
@@ -19,7 +19,7 @@ interface Message extends Serializable
     public function getRecipients();
 
     /**
-     * @return string Rew string as email headers
+     * @return string Raw string as email headers
      */
     public function getHeadersRaw();
 

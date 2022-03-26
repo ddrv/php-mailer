@@ -138,7 +138,7 @@ final class Message implements MessageContract
         'eps' => 'application/postscript',
         'ps' => 'application/postscript',
 
-        // ms office
+        // MS Office
         'doc' => 'application/msword',
         'rtf' => 'application/rtf',
         'xls' => 'application/vnd.ms-excel',
@@ -187,7 +187,7 @@ final class Message implements MessageContract
 
     /**
      * @param string|null $subject Subject of message.
-     * @return self
+     * @return $this
      */
     public function setSubject($subject)
     {
@@ -198,7 +198,7 @@ final class Message implements MessageContract
 
     /**
      * @param string|null $html HTML text of message.
-     * @return self
+     * @return $this
      */
     public function setHtml($html = null)
     {
@@ -216,7 +216,7 @@ final class Message implements MessageContract
 
     /**
      * @param string|null $text Plain text of message.
-     * @return self
+     * @return $this
      */
     public function setText($text = null)
     {
@@ -258,7 +258,7 @@ final class Message implements MessageContract
      * @param string $email Recipient email.
      * @param string|null $name Recipient name.
      * @param string $type Recipient type. May be 'to', 'cc' or 'bcc'. Default 'to'.
-     * @return self
+     * @return $this
      * @throws InvalidEmailException
      */
     public function addRecipient($email, $name = null, $type = self::RECIPIENT_TO)
@@ -290,7 +290,7 @@ final class Message implements MessageContract
 
     /**
      * @param string $email Recipient email.
-     * @return self
+     * @return $this
      */
     public function removeRecipient($email)
     {
@@ -303,7 +303,7 @@ final class Message implements MessageContract
 
     /**
      * @param string $type Recipient type. May be 'to', 'cc', 'bcc' or null. Default null.
-     * @return self
+     * @return $this
      */
     public function removeRecipients($type = null)
     {
@@ -327,7 +327,7 @@ final class Message implements MessageContract
      * @param string $name
      * @param string $content
      * @param string|null $mime
-     * @return self
+     * @return $this
      */
     public function attachFromString($name, $content, $mime = null)
     {
@@ -348,7 +348,7 @@ final class Message implements MessageContract
      * @param string $name
      * @param string $path
      * @param string|null $mime
-     * @return self
+     * @return $this
      */
     public function attachFromFile($name, $path, $mime = null)
     {
@@ -368,7 +368,7 @@ final class Message implements MessageContract
 
     /**
      * @param string $name
-     * @return self
+     * @return $this
      */
     public function detach($name)
     {
@@ -384,7 +384,7 @@ final class Message implements MessageContract
      * @param string $id
      * @param string $content
      * @param string $mime
-     * @return self
+     * @return $this
      */
     public function setHtmlContentFromString($id, $content, $mime = 'application/octet-stream')
     {
@@ -405,7 +405,7 @@ final class Message implements MessageContract
      * @param string $id
      * @param string $path
      * @param string $mime
-     * @return self
+     * @return $this
      */
     public function setHtmlContentFromFile($id, $path, $mime = 'application/octet-stream')
     {
@@ -425,7 +425,7 @@ final class Message implements MessageContract
 
     /**
      * @param string $id
-     * @return self
+     * @return $this
      */
     public function unsetBodyHtmlContent($id)
     {
@@ -440,7 +440,7 @@ final class Message implements MessageContract
     /**
      * @param string $header Header name.
      * @param string|null $value Header values.
-     * @return self
+     * @return $this
      */
     public function setHeader($header, $value)
     {
@@ -475,7 +475,7 @@ final class Message implements MessageContract
 
     /**
      * @param string $header Header name.
-     * @return string|null Header values.
+     * @return $this
      */
     public function removeHeader($header)
     {
@@ -485,7 +485,7 @@ final class Message implements MessageContract
     }
 
     /**
-     * @return string[] Recipients emails.
+     * @inheritDoc
      */
     public function getRecipients()
     {
@@ -501,7 +501,7 @@ final class Message implements MessageContract
     }
 
     /**
-     * @return string Rew string as email headers
+     * @inheritDoc
      */
     public function getHeadersRaw()
     {
@@ -540,6 +540,9 @@ final class Message implements MessageContract
         return $info['data'];
     }
 
+    /**
+     * @inheritDoc
+     */
     public function getPersonalMessages()
     {
         $messages = array();
@@ -572,9 +575,9 @@ final class Message implements MessageContract
     /**
      * @inheritDoc
      */
-    public function unserialize($serialized)
+    public function unserialize($data)
     {
-        $raw = unserialize($serialized);
+        $raw = unserialize($data);
         $empty = array(
             'id' => array(),
             'headers' => array(),
@@ -650,7 +653,7 @@ final class Message implements MessageContract
         if (!is_null($this->text) && is_null($this->html)) {
             $result['type'] = 'text/plain; charset=UTF-8';
             if (!$onlyType) {
-                $result['data'] = quoted_printable_encode($this->text);
+                $result['data'] = $this->encodeBody($this->text);
             }
             return $result;
         }
@@ -671,7 +674,7 @@ final class Message implements MessageContract
         $text .= 'Content-Type: text/plain; charset=UTF-8' . $eol;
         $text .= 'Content-Transfer-Encoding: quoted-printable' . $eol;
         $text .= $eol;
-        $text .= quoted_printable_encode($this->text) . $eol;
+        $text .= $this->encodeBody($this->text) . $eol;
 
         $html = $eol;
         $html .= $this->encodeHeader('Content-Type', $htmlInfo['type']) . $eol;
@@ -698,7 +701,7 @@ final class Message implements MessageContract
         if (is_null($this->html)) {
             return $result;
         }
-        $raw = quoted_printable_encode($this->html);
+        $raw = $this->encodeBody($this->html);
         if (empty($this->contents)) {
             $result['type'] = 'text/html; charset=UTF-8';
         } else {
@@ -749,16 +752,13 @@ final class Message implements MessageContract
     {
         $start = 268435456;
         $finish = 4294967295;
-        $rand = null;
-        if (function_exists('random_int')) {
-            try {
-                /** @noinspection PhpElementIsNotAvailableInCurrentPhpVersionInspection */
-                $rand = random_int($start, $finish);
-            } catch (Exception $e) {
-                $rand = null;
-            }
+        if (!function_exists('random_int')) {
+            return dechex(rand($start, $finish));
         }
-        if (!$rand) {
+
+        try {
+            $rand = random_int($start, $finish);
+        } catch (Exception $e) {
             $rand = rand($start, $finish);
         }
         return dechex($rand);
@@ -767,14 +767,14 @@ final class Message implements MessageContract
     /**
      * @param string $header Header name.
      * @param string $value Header values.
-     * @return self
+     * @return void
      */
     private function setAnyHeader($header, $value)
     {
         $header = $this->prepareHeaderName($header);
         $value = $this->prepareHeaderValue($value);
         if (!$header) {
-            return $this;
+            return;
         }
         if ($value) {
             $this->headers[$header] = $value;
@@ -783,12 +783,11 @@ final class Message implements MessageContract
                 unset($this->headers[$header]);
             }
         }
-        return $this;
     }
 
     /**
      * @param string $header Header name.
-     * @return string|null Header values.
+     * @return void
      */
     private function removeAnyHeader($header)
     {
@@ -796,13 +795,12 @@ final class Message implements MessageContract
         if (array_key_exists($header, $this->headers)) {
             unset($this->headers[$header]);
         }
-        return $this;
     }
 
     /**
      * @param string $header
      * @param bool $removing
-     * @return bool
+     * @return void
      * @throws HeaderNotModifiedException
      */
     private function touchHeader($header, $removing)
@@ -814,7 +812,6 @@ final class Message implements MessageContract
             $method = is_array($this->protectedHeaders[$header]) ? $this->protectedHeaders[$header][$key] : null;
             throw new HeaderNotModifiedException($header, $method);
         }
-        return true;
     }
 
     /**
@@ -829,14 +826,13 @@ final class Message implements MessageContract
         if ($name === 'message-id') {
             return 'Message-ID';
         }
-        $name = preg_replace_callback(
+        return preg_replace_callback(
             '/(^|-)[a-z]/ui',
             function ($match) {
                 return strtoupper($match[0]);
             },
             $name
         );
-        return $name;
     }
 
     /**
@@ -931,8 +927,7 @@ final class Message implements MessageContract
      */
     private function prepareContentId($name)
     {
-        $name = (string)$name;
-        return $name;
+        return (string)$name;
     }
 
     /**
@@ -1002,6 +997,15 @@ final class Message implements MessageContract
             $result .= $line;
         }
         return $result;
+    }
+
+    /**
+     * @param string $data
+     * @return string
+     */
+    private function encodeBody($data)
+    {
+        return quoted_printable_encode($data);
     }
 
     /**
