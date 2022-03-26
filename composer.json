@@ -25,7 +25,8 @@
     "autoload": {
         "psr-4": {
             "Ddrv\\Mailer\\": "src/"
-        }
+        },
+        "files": ["fn/fn.php"]
     },
     "autoload-dev": {
         "psr-4": {
